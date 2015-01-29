@@ -11,11 +11,11 @@ import time
 from distutils.version import LooseVersion
 
 import numpy as np
-from numpy.testing import dec
+from numpy.testing import dec, run_module_suite
 from numpy import pi
 
 import scipy.special as sc
-from scipy.lib.six import reraise, with_metaclass
+from scipy._lib.six import reraise, with_metaclass
 from scipy.special._testutils import FuncData, assert_func_equal
 
 try:
@@ -920,9 +920,10 @@ class TestSystematic(with_metaclass(_SystematicMeta, object)):
     def test_ci(self):
         def ci(x):
             return sc.sici(x)[1]
+        # oscillating function: limit range
         assert_mpmath_equal(ci,
                             mpmath.ci,
-                            [Arg()])
+                            [Arg(-1e8, 1e8)])
 
     def test_digamma(self):
         assert_mpmath_equal(sc.digamma,
@@ -978,13 +979,27 @@ class TestSystematic(with_metaclass(_SystematicMeta, object)):
     def test_ellipe(self):
         assert_mpmath_equal(sc.ellipe,
                             mpmath.ellipe,
-                            [Arg()])
+                            [Arg(b=1.0)])
 
-    @knownfailure_overridable("insufficient accuracy from Cephes at phi < 0, or for extremely large m")
+    def test_ellipeinc(self):
+        assert_mpmath_equal(sc.ellipeinc,
+                            mpmath.ellipe,
+                            [Arg(-1e3, 1e3), Arg(b=1.0)])
+
+    def test_ellipeinc_largephi(self):
+        assert_mpmath_equal(sc.ellipeinc,
+                            mpmath.ellipe,
+                            [Arg(), Arg()])
+
     def test_ellipf(self):
         assert_mpmath_equal(sc.ellipkinc,
                             mpmath.ellipf,
-                            [Arg(), Arg(b=1.0)])
+                            [Arg(-1e3, 1e3), Arg()])
+
+    def test_ellipf_largephi(self):
+        assert_mpmath_equal(sc.ellipkinc,
+                            mpmath.ellipf,
+                            [Arg(), Arg()])
 
     def test_ellipk(self):
         assert_mpmath_equal(sc.ellipk,
@@ -994,6 +1009,22 @@ class TestSystematic(with_metaclass(_SystematicMeta, object)):
                             lambda m: mpmath.ellipk(1 - m),
                             [Arg(a=0.0)],
                             dps=400)
+
+    def test_ellipkinc(self):
+        def ellipkinc(phi, m):
+            return mpmath.ellippi(0, phi, m)
+        assert_mpmath_equal(sc.ellipkinc,
+                            ellipkinc,
+                            [Arg(-1e3, 1e3), Arg(b=1.0)],
+                            ignore_inf_sign=True)
+
+    def test_ellipkinc_largephi(self):
+        def ellipkinc(phi, m):
+            return mpmath.ellippi(0, phi, m)
+        assert_mpmath_equal(sc.ellipkinc,
+                            ellipkinc,
+                            [Arg(), Arg(b=1.0)],
+                            ignore_inf_sign=True)
 
     def test_ellipfun_sn(self):
         # Oscillating function --- limit range of first argument; the
@@ -1570,3 +1601,42 @@ class TestSystematic(with_metaclass(_SystematicMeta, object)):
                             _exception_to_nan(mpmath.zeta),
                             [Arg(a=1, b=1e10, inclusive_a=False),
                              Arg(a=0, inclusive_a=False)])
+
+    def test_boxcox(self):
+
+        def mp_boxcox(x, lmbda):
+            x = mpmath.mp.mpf(x)
+            lmbda = mpmath.mp.mpf(lmbda)
+            if lmbda == 0:
+                return mpmath.mp.log(x)
+            else:
+                return mpmath.mp.powm1(x, lmbda) / lmbda
+
+        assert_mpmath_equal(sc.boxcox,
+                            _exception_to_nan(mp_boxcox),
+                            [Arg(a=0, inclusive_a=False), Arg()],
+                            n=200,
+                            dps=60,
+                            rtol=1e-13)
+
+    def test_boxcox1p(self):
+
+        def mp_boxcox1p(x, lmbda):
+            x = mpmath.mp.mpf(x)
+            lmbda = mpmath.mp.mpf(lmbda)
+            one = mpmath.mp.mpf(1)
+            if lmbda == 0:
+                return mpmath.mp.log(one + x)
+            else:
+                return mpmath.mp.powm1(one + x, lmbda) / lmbda
+
+        assert_mpmath_equal(sc.boxcox1p,
+                            _exception_to_nan(mp_boxcox1p),
+                            [Arg(a=-1, inclusive_a=False), Arg()],
+                            n=200,
+                            dps=60,
+                            rtol=1e-13)
+
+
+if __name__ == "__main__":
+    run_module_suite()

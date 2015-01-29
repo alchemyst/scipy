@@ -117,19 +117,19 @@ conditions.
 
 .. plot::
 
-   >>> from numpy import *
+   >>> import numpy as np
    >>> from scipy import signal, misc
    >>> import matplotlib.pyplot as plt
 
-   >>> image = misc.lena().astype(float32)
-   >>> derfilt = array([1.0,-2,1.0],float32)
-   >>> ck = signal.cspline2d(image,8.0)
-   >>> deriv = signal.sepfir2d(ck, derfilt, [1]) + \
-   >>>         signal.sepfir2d(ck, [1], derfilt)
+   >>> image = misc.lena().astype(np.float32)
+   >>> derfilt = np.array([1.0, -2, 1.0], dtype=np.float32)
+   >>> ck = signal.cspline2d(image, 8.0)
+   >>> deriv = (signal.sepfir2d(ck, derfilt, [1]) +
+   ...          signal.sepfir2d(ck, [1], derfilt))
 
    Alternatively we could have done::
 
-       laplacian = array([[0,1,0],[1,-4,1],[0,1,0]],float32)
+       laplacian = np.array([[0,1,0], [1,-4,1], [0,1,0]], dtype=np.float32)
        deriv2 = signal.convolve2d(ck,laplacian,mode='same',boundary='symm')
 
    >>> plt.figure()
@@ -434,7 +434,7 @@ m<K,`
 
     z_{m}\left[n\right]=\sum_{p=0}^{K-m-1}\left(b_{m+p+1}x\left[n-p\right]-a_{m+p+1}y\left[n-p\right]\right).
 
-Using this formula we can find the intial condition vector
+Using this formula we can find the initial condition vector
 :math:`z_{0}\left[-1\right]` to :math:`z_{K-1}\left[-1\right]` given initial
 conditions on :math:`y` (and :math:`x` ). The command :func:`lfiltic` performs
 this function.
@@ -447,7 +447,7 @@ As an example consider the following system:
 
 The code calculates the signal :math:`y[n]` for a given signal :math:`x[n]`;
 first for initial condiditions :math:`y[-1] = 0` (default case), then for
-:math:`y[-1] = 2` by means of :fun:`lfiltic`.
+:math:`y[-1] = 2` by means of :func:`lfiltic`.
 
 >>> import numpy as np
 >>> from scipy import signal
@@ -573,7 +573,7 @@ argument and several more filter design functions for specific filter types;
 e.g. :func:`ellip`.
 
 The example below designs an elliptic low-pass filter with defined passband
-and stopband ripple, repsectively. Note the much lower filter order (order 4)
+and stopband ripple, respectively. Note the much lower filter order (order 4)
 compared with the FIR filters from the examples above in order to reach the same 
 stop-band attenuation of :math:`\approx 60` dB.
 

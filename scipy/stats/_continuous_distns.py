@@ -11,46 +11,26 @@ from scipy.misc.doccer import inherit_docstring_from
 from scipy import special
 from scipy import optimize
 from scipy import integrate
-from scipy.special import (gammaln as gamln, gamma as gam)
+from scipy.special import (gammaln as gamln, gamma as gam, boxcox, boxcox1p,
+                           inv_boxcox, inv_boxcox1p)
 
 from numpy import (where, arange, putmask, ravel, sum, shape,
                    log, sqrt, exp, arctanh, tan, sin, arcsin, arctan,
-                   tanh, cos, cosh, sinh, log1p, expm1)
+                   tanh, cos, cosh, sinh)
 
 from numpy import polyval, place, extract, any, asarray, nan, inf, pi
 
 import numpy as np
-import numpy.random as mtrand
 from . import vonmises_cython
 from ._tukeylambda_stats import (tukeylambda_variance as _tlvar,
                                  tukeylambda_kurtosis as _tlkurt)
 
 from ._distn_infrastructure import (
-        rv_continuous, valarray,
-        _skew, _kurtosis, _lazywhere,
-        _ncx2_log_pdf, _ncx2_pdf, _ncx2_cdf,
+        rv_continuous, valarray, _skew, _kurtosis, _lazywhere,
+        _ncx2_log_pdf, _ncx2_pdf, _ncx2_cdf, get_distribution_names,
         )
 
 from ._constants import _XMIN, _EULER, _ZETA3
-
-__all__ = [
-    'ksone', 'kstwobign', 'norm', 'alpha', 'anglit', 'arcsine',
-    'beta', 'betaprime', 'bradford', 'burr', 'fisk', 'cauchy',
-    'chi', 'chi2', 'cosine', 'dgamma', 'dweibull', 'erlang',
-    'expon', 'exponweib', 'exponpow', 'fatiguelife', 'foldcauchy',
-    'f', 'foldnorm', 'frechet_r', 'weibull_min', 'frechet_l',
-    'weibull_max', 'genlogistic', 'genpareto', 'genexpon', 'genextreme',
-    'gamma', 'gengamma', 'genhalflogistic', 'gompertz', 'gumbel_r',
-    'gumbel_l', 'halfcauchy', 'halflogistic', 'halfnorm', 'hypsecant',
-    'gausshyper', 'invgamma', 'invgauss', 'invweibull',
-    'johnsonsb', 'johnsonsu', 'laplace', 'levy', 'levy_l',
-    'levy_stable', 'logistic', 'loggamma', 'loglaplace', 'lognorm',
-    'gilbrat', 'maxwell', 'mielke', 'nakagami', 'ncx2', 'ncf', 't',
-    'nct', 'pareto', 'lomax', 'pearson3', 'powerlaw', 'powerlognorm',
-    'powernorm', 'rdist', 'rayleigh', 'reciprocal', 'rice',
-    'recipinvgauss', 'semicircular', 'triang', 'truncexpon',
-    'truncnorm', 'tukeylambda', 'uniform', 'vonmises', 'vonmises_line',
-    'wald', 'wrapcauchy']
 
 
 ## Kolmogorov-Smirnov one-sided and two-sided test statistics
@@ -75,7 +55,7 @@ class kstwobign_gen(rv_continuous):
 
     """
     def _cdf(self, x):
-        return 1.0-special.kolmogorov(x)
+        return 1.0 - special.kolmogorov(x)
 
     def _sf(self, x):
         return special.kolmogorov(x)
@@ -144,7 +124,7 @@ class norm_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return mtrand.standard_normal(self._size)
+        return self._random_state.standard_normal(self._size)
 
     def _pdf(self, x):
         return _norm_pdf(x)
@@ -286,7 +266,8 @@ class arcsine_gen(rv_continuous):
     The probability density function for `arcsine` is::
 
         arcsine.pdf(x) = 1/(pi*sqrt(x*(1-x)))
-        for 0 < x < 1.
+
+    for ``0 < x < 1``.
 
     %(example)s
 
@@ -366,16 +347,18 @@ class beta_gen(rv_continuous):
     -----
     The probability density function for `beta` is::
 
-        beta.pdf(x, a, b) = gamma(a+b)/(gamma(a)*gamma(b)) * x**(a-1) *
-        (1-x)**(b-1),
+                            gamma(a+b) * x**(a-1) * (1-x)**(b-1)
+        beta.pdf(x, a, b) = ------------------------------------
+                                     gamma(a)*gamma(b)
 
-    for ``0 < x < 1``, ``a > 0``, ``b > 0``.
+    for ``0 < x < 1``, ``a > 0``, ``b > 0``, where ``gamma(z)`` is the gamma
+    function (`scipy.special.gamma`).
 
     %(example)s
 
     """
     def _rvs(self, a, b):
-        return mtrand.beta(a, b, self._size)
+        return self._random_state.beta(a, b, self._size)
 
     def _pdf(self, x, a, b):
         return np.exp(self._logpdf(x, a, b))
@@ -530,8 +513,9 @@ class betaprime_gen(rv_continuous):
 
     """
     def _rvs(self, a, b):
-        u1 = gamma.rvs(a, size=self._size)
-        u2 = gamma.rvs(b, size=self._size)
+        sz, rndm = self._size, self._random_state
+        u1 = gamma.rvs(a, size=sz, random_state=rndm)
+        u2 = gamma.rvs(b, size=sz, random_state=rndm)
         return (u1 / u2)
 
     def _pdf(self, x, a, b):
@@ -541,10 +525,8 @@ class betaprime_gen(rv_continuous):
         return (special.xlogy(a-1.0, x) - special.xlog1py(a+b, x) -
                 special.betaln(a, b))
 
-    def _cdf_skip(self, x, a, b):
-        # remove for now: special.hyp2f1 is incorrect for large a
-        x = where(x == 1.0, 1.0-1e-6, x)
-        return pow(x, a)*special.hyp2f1(a+b, a, 1+a, -x)/a/special.beta(a, b)
+    def _cdf(self, x, a, b):
+        return special.betainc(a, b, x/(1.+x))
 
     def _munp(self, n, a, b):
         if (n == 1.0):
@@ -732,15 +714,16 @@ class chi_gen(rv_continuous):
 
     Special cases of `chi` are:
 
-        - ``chi(1, loc, scale) = `halfnormal`
-        - ``chi(2, 0, scale) = `rayleigh`
-        - ``chi(3, 0, scale) : `maxwell`
+        - ``chi(1, loc, scale)`` is equivalent to `halfnorm`
+        - ``chi(2, 0, scale)`` is equivalent to `rayleigh`
+        - ``chi(3, 0, scale)`` is equivalent to `maxwell`
 
     %(example)s
 
     """
     def _rvs(self, df):
-        return sqrt(chi2.rvs(df, size=self._size))
+        sz, rndm = self._size, self._random_state
+        return sqrt(chi2.rvs(df, size=sz, random_state=rndm))
 
     def _pdf(self, x, df):
         return x**(df-1.)*exp(-x*x*0.5)/(2.0)**(df*0.5-1)/gam(df*0.5)
@@ -777,7 +760,7 @@ class chi2_gen(rv_continuous):
 
     """
     def _rvs(self, df):
-        return mtrand.chisquare(df, self._size)
+        return self._random_state.chisquare(df, self._size)
 
     def _pdf(self, x, df):
         return exp(self._logpdf(x, df))
@@ -854,8 +837,10 @@ class dgamma_gen(rv_continuous):
 
     """
     def _rvs(self, a):
-        u = mtrand.random_sample(size=self._size)
-        return (gamma.rvs(a, size=self._size)*where(u >= 0.5, 1, -1))
+        sz, rndm = self._size, self._random_state
+        u = rndm.random_sample(size=sz)
+        gm = gamma.rvs(a, size=sz, random_state=rndm)
+        return gm * where(u >= 0.5, 1, -1)
 
     def _pdf(self, x, a):
         ax = abs(x)
@@ -898,8 +883,10 @@ class dweibull_gen(rv_continuous):
 
     """
     def _rvs(self, c):
-        u = mtrand.random_sample(size=self._size)
-        return weibull_min.rvs(c, size=self._size) * (where(u >= 0.5, 1, -1))
+        sz, rndm = self._size, self._random_state
+        u = rndm.random_sample(size=sz)
+        w = weibull_min.rvs(c, size=sz, random_state=rndm)
+        return w * (where(u >= 0.5, 1, -1))
 
     def _pdf(self, x, c):
         ax = abs(x)
@@ -952,7 +939,7 @@ class expon_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return mtrand.standard_exponential(self._size)
+        return self._random_state.standard_exponential(self._size)
 
     def _pdf(self, x):
         return exp(-x)
@@ -961,10 +948,10 @@ class expon_gen(rv_continuous):
         return -x
 
     def _cdf(self, x):
-        return -expm1(-x)
+        return -special.expm1(-x)
 
     def _ppf(self, q):
-        return -log1p(-q)
+        return -special.log1p(-q)
 
     def _sf(self, x):
         return exp(-x)
@@ -1001,19 +988,21 @@ class exponweib_gen(rv_continuous):
 
     """
     def _pdf(self, x, a, c):
-        exc = exp(-x**c)
-        return a*c*(1-exc)**asarray(a-1) * exc * x**(c-1)
+        return exp(self._logpdf(x, a, c))
 
     def _logpdf(self, x, a, c):
-        exc = exp(-x**c)
-        return log(a) + log(c) + (a-1.)*log(1-exc) - x**c + (c-1.0)*log(x)
+        negxc = -x**c
+        exm1c = -special.expm1(negxc)
+        logp = (log(a) + log(c) + special.xlogy(a - 1.0, exm1c) +
+                negxc + special.xlogy(c - 1.0, x))
+        return logp
 
     def _cdf(self, x, a, c):
-        exm1c = -expm1(-x**c)
-        return (exm1c)**a
+        exm1c = -special.expm1(-x**c)
+        return exm1c**a
 
     def _ppf(self, q, a, c):
-        return (-log1p(-q**(1.0/a)))**asarray(1.0/c)
+        return (-special.log1p(-q**(1.0/a)))**asarray(1.0/c)
 exponweib = exponweib_gen(a=0.0, name='exponweib')
 
 
@@ -1040,30 +1029,29 @@ class exponpow_gen(rv_continuous):
 
     """
     def _pdf(self, x, b):
-        xbm1 = x**(b-1.0)
-        xb = xbm1 * x
-        return exp(1)*b*xbm1 * exp(xb - exp(xb))
+        return exp(self._logpdf(x, b))
 
     def _logpdf(self, x, b):
-        xb = x**(b-1.0)*x
-        return 1 + log(b) + (b-1.0)*log(x) + xb - exp(xb)
+        xb = x**b
+        f = 1 + log(b) + special.xlogy(b - 1.0, x) + xb - exp(xb)
+        return f
 
     def _cdf(self, x, b):
-        return -expm1(-expm1(x**b))
+        return -special.expm1(-special.expm1(x**b))
 
     def _sf(self, x, b):
-        return exp(-expm1(x**b))
+        return exp(-special.expm1(x**b))
 
     def _isf(self, x, b):
-        return (log1p(-log(x)))**(1./b)
+        return (special.log1p(-log(x)))**(1./b)
 
     def _ppf(self, q, b):
-        return pow(log1p(-log1p(-q)), 1.0/b)
+        return pow(special.log1p(-special.log1p(-q)), 1.0/b)
 exponpow = exponpow_gen(a=0.0, name='exponpow')
 
 
 class fatiguelife_gen(rv_continuous):
-    """A fatigue-life (Birnbaum-Sanders) continuous random variable.
+    """A fatigue-life (Birnbaum-Saunders) continuous random variable.
 
     %(before_notes)s
 
@@ -1076,11 +1064,16 @@ class fatiguelife_gen(rv_continuous):
 
     for ``x > 0``.
 
+    References
+    ----------
+    .. [1] "Birnbaum-Saunders distribution",
+           http://en.wikipedia.org/wiki/Birnbaum-Saunders_distribution
+
     %(example)s
 
     """
     def _rvs(self, c):
-        z = mtrand.standard_normal(self._size)
+        z = self._random_state.standard_normal(self._size)
         x = 0.5*c*z
         x2 = x*x
         t = 1.0 + 2*x2 + 2*x*sqrt(1 + x2)
@@ -1133,7 +1126,8 @@ class foldcauchy_gen(rv_continuous):
 
     """
     def _rvs(self, c):
-        return abs(cauchy.rvs(loc=c, size=self._size))
+        return abs(cauchy.rvs(loc=c, size=self._size,
+                              random_state=self._random_state))
 
     def _pdf(self, x, c):
         return 1.0/pi*(1.0/(1+(x-c)**2) + 1.0/(1+(x+c)**2))
@@ -1165,7 +1159,7 @@ class f_gen(rv_continuous):
 
     """
     def _rvs(self, dfn, dfd):
-        return mtrand.f(dfn, dfd, self._size)
+        return self._random_state.f(dfn, dfd, self._size)
 
     def _pdf(self, x, dfn, dfd):
         return exp(self._logpdf(x, dfn, dfd))
@@ -1246,7 +1240,7 @@ class foldnorm_gen(rv_continuous):
         return (c >= 0)
 
     def _rvs(self, c):
-        return abs(mtrand.standard_normal(self._size) + c)
+        return abs(self._random_state.standard_normal(self._size) + c)
 
     def _pdf(self, x, c):
         return _norm_pdf(x + c) + _norm_pdf(x-c)
@@ -1307,10 +1301,10 @@ class frechet_r_gen(rv_continuous):
         return log(c) + (c-1)*log(x) - pow(x, c)
 
     def _cdf(self, x, c):
-        return -expm1(-pow(x, c))
+        return -special.expm1(-pow(x, c))
 
     def _ppf(self, q, c):
-        return pow(-log1p(-q), 1.0/c)
+        return pow(-special.log1p(-q), 1.0/c)
 
     def _munp(self, n, c):
         return special.gamma(1.0+n*1.0/c)
@@ -1385,7 +1379,7 @@ class genlogistic_gen(rv_continuous):
         return exp(self._logpdf(x, c))
 
     def _logpdf(self, x, c):
-        return log(c) - x - (c+1.0)*log1p(exp(-x))
+        return log(c) - x - (c+1.0)*special.log1p(exp(-x))
 
     def _cdf(self, x, c):
         Cx = (1+exp(-x))**(-c)
@@ -1418,42 +1412,60 @@ class genpareto_gen(rv_continuous):
 
         genpareto.pdf(x, c) = (1 + c * x)**(-1 - 1/c)
 
-    for ``c != 0``, and for ``x >= 0`` for all c,
-    and ``x < 1/abs(c)`` for ``c < 0``.
+    defined for ``x >= 0`` if ``c >=0``, and for
+    ``0 <= x <= -1/c`` if ``c < 0``.
+
+    For ``c == 0``, `genpareto` reduces to the exponential
+    distribution, `expon`::
+
+        genpareto.pdf(x, c=0) = exp(-x)
+
+    For ``c == -1``, `genpareto` is uniform on ``[0, 1]``::
+
+        genpareto.cdf(x, c=-1) = x
 
     %(example)s
 
     """
     def _argcheck(self, c):
         c = asarray(c)
-        self.b = where(c < 0, 1.0/abs(c), inf)
-        return where(c == 0, 0, 1)
+        self.b = _lazywhere(c < 0, (c,),
+                lambda c: -1. / c, np.inf)
+        return True
 
     def _pdf(self, x, c):
-        Px = pow(1+c*x, asarray(-1.0-1.0/c))
-        return Px
+        return np.exp(self._logpdf(x, c))
 
     def _logpdf(self, x, c):
-        return (-1.0-1.0/c) * np.log1p(c*x)
+        return _lazywhere((x == x) & (c != 0), (x, c),
+            lambda x, c: -special.xlog1py(c+1., c*x) / c,
+            -x)
 
     def _cdf(self, x, c):
-        return 1.0 - pow(1+c*x, asarray(-1.0/c))
+        return -inv_boxcox1p(-x, -c)
+
+    def _sf(self, x, c):
+        return inv_boxcox(-x, -c)
 
     def _ppf(self, q, c):
-        vals = 1.0/c * (pow(1-q, -c)-1)
-        return vals
+        return -boxcox1p(-q, -c)
+
+    def _isf(self, q, c):
+        return -boxcox(q, -c)
 
     def _munp(self, n, c):
-        k = arange(0, n+1)
-        val = (-1.0/c)**n * sum(comb(n, k)*(-1)**k / (1.0-c*k), axis=0)
-        return where(c*n < 1, val, inf)
+        def __munp(n, c):
+            val = 0.0
+            k = arange(0, n + 1)
+            for ki, cnk in zip(k, comb(n, k)):
+                val = val + cnk * (-1) ** ki / (1.0 - c * ki)
+            return where(c * n < 1, val * (-1.0 / c) ** n, inf)
+        return _lazywhere(c != 0, (c,),
+                lambda c: __munp(n, c),
+                gam(n + 1))
 
     def _entropy(self, c):
-        if (c > 0):
-            return 1+c
-        else:
-            self.b = -1.0 / c
-            return rv_continuous._entropy(self, c)
+        return 1. + c
 genpareto = genpareto_gen(a=0.0, name='genpareto')
 
 
@@ -1483,13 +1495,15 @@ class genexpon_gen(rv_continuous):
 
     """
     def _pdf(self, x, a, b, c):
-        return (a+b*(-expm1(-c*x)))*exp((-a-b)*x+b*(-expm1(-c*x))/c)
+        return (a + b*(-special.expm1(-c*x)))*exp((-a-b)*x +
+            b*(-special.expm1(-c*x))/c)
 
     def _cdf(self, x, a, b, c):
-        return -expm1((-a-b)*x + b*(-expm1(-c*x))/c)
+        return -special.expm1((-a-b)*x + b*(-special.expm1(-c*x))/c)
 
     def _logpdf(self, x, a, b, c):
-        return np.log(a+b*(-expm1(-c*x))) + (-a-b)*x+b*(-expm1(-c*x))/c
+        return np.log(a+b*(-special.expm1(-c*x))) + \
+                (-a-b)*x+b*(-special.expm1(-c*x))/c
 genexpon = genexpon_gen(a=0.0, name='genexpon')
 
 
@@ -1511,6 +1525,9 @@ class genextreme_gen(rv_continuous):
             exp(-exp(-x))*exp(-x),                    for c==0
             exp(-(1-c*x)**(1/c))*(1-c*x)**(1/c-1),    for x <= 1/c, c > 0
 
+    Note that several sources and software packages use the opposite
+    convention for the sign of the shape parameter ``c``.
+
     %(example)s
 
     """
@@ -1523,7 +1540,7 @@ class genextreme_gen(rv_continuous):
 
     def _pdf(self, x, c):
         cx = c*x
-        logex2 = where((c == 0)*(x == x), 0.0, log1p(-cx))
+        logex2 = where((c == 0)*(x == x), 0.0, special.log1p(-cx))
         logpex2 = where((c == 0)*(x == x), -x, logex2/c)
         pex2 = exp(logpex2)
         # Handle special cases
@@ -1532,12 +1549,12 @@ class genextreme_gen(rv_continuous):
         return exp(logpdf)
 
     def _cdf(self, x, c):
-        loglogcdf = where((c == 0)*(x == x), -x, log1p(-c*x)/c)
+        loglogcdf = where((c == 0)*(x == x), -x, special.log1p(-c*x)/c)
         return exp(-exp(loglogcdf))
 
     def _ppf(self, q, c):
         x = -log(-log(q))
-        return where((c == 0)*(x == x), x, -expm1(-c*x)/c)
+        return where((c == 0)*(x == x), x, -special.expm1(-c*x)/c)
 
     def _stats(self, c):
         g = lambda n: gam(n*c+1)
@@ -1547,9 +1564,9 @@ class genextreme_gen(rv_continuous):
         g4 = g(4)
         g2mg12 = where(abs(c) < 1e-7, (c*pi)**2.0/6.0, g2-g1**2.0)
         gam2k = where(abs(c) < 1e-7, pi**2.0/6.0,
-                      expm1(gamln(2.0*c+1.0)-2*gamln(c+1.0))/c**2.0)
+                      special.expm1(gamln(2.0*c+1.0)-2*gamln(c+1.0))/c**2.0)
         eps = 1e-14
-        gamk = where(abs(c) < eps, -_EULER, expm1(gamln(c+1))/c)
+        gamk = where(abs(c) < eps, -_EULER, special.expm1(gamln(c+1))/c)
 
         m = where(c < -1.0, nan, -gamk)
         v = where(c < -0.5, nan, g1**2.0*gam2k)
@@ -1651,7 +1668,7 @@ class gamma_gen(rv_continuous):
 
     """
     def _rvs(self, a):
-        return mtrand.standard_gamma(a, self._size)
+        return self._random_state.standard_gamma(a, self._size)
 
     def _pdf(self, x, a):
         return exp(self._logpdf(x, a))
@@ -1828,7 +1845,10 @@ class gengamma_gen(rv_continuous):
         return (a > 0) & (c != 0)
 
     def _pdf(self, x, a, c):
-        return abs(c) * exp((c*a-1)*log(x)-x**c - gamln(a))
+        return exp(self._logpdf(x, a, c))
+
+    def _logpdf(self, x, a, c):
+        return log(abs(c)) + special.xlogy(c*a - 1, x) - x**c - gamln(a)
 
     def _cdf(self, x, a, c):
         val = special.gammainc(a, x**c)
@@ -1912,13 +1932,13 @@ class gompertz_gen(rv_continuous):
         return exp(self._logpdf(x, c))
 
     def _logpdf(self, x, c):
-        return log(c) + x - c * (exp(x) - 1.)
+        return log(c) + x - c * special.expm1(x)
 
     def _cdf(self, x, c):
-        return 1.0-exp(-c*(exp(x)-1))
+        return -special.expm1(-c * special.expm1(x))
 
     def _ppf(self, q, c):
-        return log(1-1.0/c*log(1-q))
+        return special.log1p(-1.0 / c * special.log1p(-q))
 
     def _entropy(self, c):
         return 1.0 - log(c) - exp(c)*special.expn(1, c)
@@ -2034,7 +2054,7 @@ class halfcauchy_gen(rv_continuous):
         return 2.0/pi/(1.0+x*x)
 
     def _logpdf(self, x):
-        return np.log(2.0/pi) - np.log1p(x*x)
+        return np.log(2.0/pi) - special.log1p(x*x)
 
     def _cdf(self, x):
         return 2.0/pi*arctan(x)
@@ -2113,7 +2133,7 @@ class halfnorm_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return abs(mtrand.standard_normal(size=self._size))
+        return abs(self._random_state.standard_normal(size=self._size))
 
     def _pdf(self, x):
         return sqrt(2.0/pi)*exp(-x*x/2.0)
@@ -2273,7 +2293,7 @@ class invgauss_gen(rv_continuous):
 
     """
     def _rvs(self, mu):
-        return mtrand.wald(mu, 1.0, size=self._size)
+        return self._random_state.wald(mu, 1.0, size=self._size)
 
     def _pdf(self, x, mu):
         return 1.0/sqrt(2*pi*x**3.0)*exp(-1.0/(2*x)*((x-mu)/mu)**2)
@@ -2367,7 +2387,7 @@ class johnsonsb_gen(rv_continuous):
 
     def _ppf(self, q, a, b):
         return 1.0 / (1 + exp(-1.0 / b * (_norm_ppf(q) - a)))
-johnsonsb = johnsonsb_gen(a=0.0, b=1.0, name='johnsonb')
+johnsonsb = johnsonsb_gen(a=0.0, b=1.0, name='johnsonsb')
 
 
 class johnsonsu_gen(rv_continuous):
@@ -2422,7 +2442,7 @@ class laplace_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return mtrand.laplace(0, 1, size=self._size)
+        return self._random_state.laplace(0, 1, size=self._size)
 
     def _pdf(self, x):
         return 0.5*exp(-abs(x))
@@ -2467,10 +2487,12 @@ class levy_gen(rv_continuous):
         return 1 / sqrt(2*pi*x) / x * exp(-1/(2*x))
 
     def _cdf(self, x):
-        return 2 * (1 - _norm_cdf(1 / sqrt(x)))
+        # Equivalent to 2*norm.sf(sqrt(1/x))
+        return special.erfc(sqrt(0.5 / x))
 
     def _ppf(self, q):
-        val = _norm_ppf(1 - q / 2.0)
+        # Equivalent to 1.0/(norm.isf(q/2)**2) or 0.5/(erfcinv(q)**2)
+        val = -special.ndtri(q/2)
         return 1.0 / (val * val)
 
     def _stats(self):
@@ -2581,7 +2603,7 @@ class logistic_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return mtrand.logistic(size=self._size)
+        return self._random_state.logistic(size=self._size)
 
     def _pdf(self, x):
         return exp(self._logpdf(x))
@@ -2621,7 +2643,7 @@ class loggamma_gen(rv_continuous):
 
     """
     def _rvs(self, c):
-        return log(mtrand.gamma(c, size=self._size))
+        return log(self._random_state.gamma(c, size=self._size))
 
     def _pdf(self, x, c):
         return exp(c*x-exp(x)-gamln(c))
@@ -2653,8 +2675,8 @@ class loglaplace_gen(rv_continuous):
     -----
     The probability density function for `loglaplace` is::
 
-    loglaplace.pdf(x, c) = c / 2 * x**(c-1),   for 0 < x < 1
-                         = c / 2 * x**(-c-1),  for x >= 1
+        loglaplace.pdf(x, c) = c / 2 * x**(c-1),   for 0 < x < 1
+                             = c / 2 * x**(-c-1),  for x >= 1
 
     for ``c > 0``.
 
@@ -2710,7 +2732,7 @@ class lognorm_gen(rv_continuous):
 
     """
     def _rvs(self, s):
-        return exp(s * mtrand.standard_normal(self._size))
+        return exp(s * self._random_state.standard_normal(self._size))
 
     def _pdf(self, x, s):
         return exp(self._logpdf(x, s))
@@ -2754,7 +2776,7 @@ class gilbrat_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return exp(mtrand.standard_normal(self._size))
+        return exp(self._random_state.standard_normal(self._size))
 
     def _pdf(self, x):
         return exp(self._logpdf(x))
@@ -2805,7 +2827,7 @@ class maxwell_gen(rv_continuous):
     %(example)s
     """
     def _rvs(self):
-        return chi.rvs(3.0, size=self._size)
+        return chi.rvs(3.0, size=self._size, random_state=self._random_state)
 
     def _pdf(self, x):
         return sqrt(2.0/pi)*x*x*exp(-x*x/2.0)
@@ -2899,7 +2921,7 @@ class ncx2_gen(rv_continuous):
     -----
     The probability density function for `ncx2` is::
 
-        ncx2.pdf(x, df, nc) = exp(-(nc+df)/2) * 1/2 * (x/nc)**((df-2)/4)
+        ncx2.pdf(x, df, nc) = exp(-(nc+x)/2) * 1/2 * (x/nc)**((df-2)/4)
                               * I[(df-2)/2](sqrt(nc*x))
 
     for ``x > 0``.
@@ -2908,7 +2930,7 @@ class ncx2_gen(rv_continuous):
 
     """
     def _rvs(self, df, nc):
-        return mtrand.noncentral_chisquare(df, nc, self._size)
+        return self._random_state.noncentral_chisquare(df, nc, self._size)
 
     def _logpdf(self, x, df, nc):
         return _ncx2_log_pdf(x, df, nc)
@@ -2938,12 +2960,12 @@ class ncf_gen(rv_continuous):
     -----
     The probability density function for `ncf` is::
 
-    ncf.pdf(x, df1, df2, nc) = exp(nc/2 + nc*df1*x/(2*(df1*x+df2)))
-                    * df1**(df1/2) * df2**(df2/2) * x**(df1/2-1)
-                    * (df2+df1*x)**(-(df1+df2)/2)
-                    * gamma(df1/2)*gamma(1+df2/2)
-                    * L^{v1/2-1}^{v2/2}(-nc*v1*x/(2*(v1*x+v2)))
-                    / (B(v1/2, v2/2) * gamma((v1+v2)/2))
+        ncf.pdf(x, df1, df2, nc) = exp(nc/2 + nc*df1*x/(2*(df1*x+df2))) *
+                    df1**(df1/2) * df2**(df2/2) * x**(df1/2-1) *
+                    (df2+df1*x)**(-(df1+df2)/2) *
+                    gamma(df1/2)*gamma(1+df2/2) *
+                    L^{v1/2-1}^{v2/2}(-nc*v1*x/(2*(v1*x+v2))) /
+                    (B(v1/2, v2/2) * gamma((v1+v2)/2))
 
     for ``df1, df2, nc > 0``.
 
@@ -2951,7 +2973,7 @@ class ncf_gen(rv_continuous):
 
     """
     def _rvs(self, dfn, dfd, nc):
-        return mtrand.noncentral_f(dfn, dfd, nc, self._size)
+        return self._random_state.noncentral_f(dfn, dfd, nc, self._size)
 
     def _pdf_skip(self, x, dfn, dfd, nc):
         n1, n2 = dfn, dfd
@@ -2962,8 +2984,8 @@ class ncf_gen(rv_continuous):
         Px *= (n2+n1*x)**(-(n1+n2)/2)
         Px *= special.assoc_laguerre(-nc*n1*x/(2.0*(n2+n1*x)), n2/2, n1/2-1)
         Px /= special.beta(n1/2, n2/2)
-         # this function does not have a return
-         #   drop it for now, the generic function seems to work ok
+        # This function does not have a return.  Drop it for now, the generic
+        # function seems to work OK.
 
     def _cdf(self, x, dfn, dfd, nc):
         return special.ncfdtr(dfn, dfd, nc, x)
@@ -3006,7 +3028,7 @@ class t_gen(rv_continuous):
 
     """
     def _rvs(self, df):
-        return mtrand.standard_t(df, size=self._size)
+        return self._random_state.standard_t(df, size=self._size)
 
     def _pdf(self, x, df):
         r = asarray(df*1.0)
@@ -3062,8 +3084,10 @@ class nct_gen(rv_continuous):
         return (df > 0) & (nc == nc)
 
     def _rvs(self, df, nc):
-        return (norm.rvs(loc=nc, size=self._size) * sqrt(df) /
-                sqrt(chi2.rvs(df, size=self._size)))
+        sz, rndm = self._size, self._random_state
+        n = norm.rvs(loc=nc, size=sz, random_state=rndm)
+        c2 = chi2.rvs(df, size=sz, random_state=rndm)
+        return n * sqrt(df) / sqrt(c2)
 
     def _pdf(self, x, df, nc):
         n = df*1.0
@@ -3203,19 +3227,19 @@ class lomax_gen(rv_continuous):
         return c*1.0/(1.0+x)**(c+1.0)
 
     def _logpdf(self, x, c):
-        return log(c) - (c+1)*log(1+x)
+        return log(c) - (c+1)*special.log1p(x)
 
     def _cdf(self, x, c):
-        return 1.0-1.0/(1.0+x)**c
+        return -special.expm1(-c*special.log1p(x))
 
     def _sf(self, x, c):
-        return 1.0/(1.0+x)**c
+        return exp(-c*special.log1p(x))
 
     def _logsf(self, x, c):
-        return -c*log(1+x)
+        return -c*special.log1p(x)
 
     def _ppf(self, q, c):
-        return pow(1.0-q, -1.0/c)-1
+        return special.expm1(-special.log1p(-q)/c)
 
     def _stats(self, c):
         mu, mu2, g1, g2 = pareto.stats(c, loc=-1.0, moments='mvsk')
@@ -3338,8 +3362,8 @@ class pearson3_gen(rv_continuous):
         ans, x, transx, skew, mask, invmask, beta, alpha, zeta = (
             self._preprocess([0], skew))
         if mask[0]:
-            return mtrand.standard_normal(self._size)
-        ans = mtrand.standard_gamma(alpha, self._size)/beta + zeta
+            return self._random_state.standard_normal(self._size)
+        ans = self._random_state.standard_gamma(alpha, self._size)/beta + zeta
         if ans.size == 1:
             return ans[0]
         return ans
@@ -3366,7 +3390,7 @@ class powerlaw_gen(rv_continuous):
 
     for ``0 <= x <= 1``, ``a > 0``.
 
-    `powerlaw` is a special case of `beta` with ``d == 1``.
+    `powerlaw` is a special case of `beta` with ``b == 1``.
 
     %(example)s
 
@@ -3375,7 +3399,7 @@ class powerlaw_gen(rv_continuous):
         return a*x**(a-1.0)
 
     def _logpdf(self, x, a):
-        return log(a) + (a-1)*log(x)
+        return log(a) + special.xlogy(a - 1, x)
 
     def _cdf(self, x, a):
         return x**(a*1.0)
@@ -3512,16 +3536,22 @@ class rayleigh_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return chi.rvs(2, size=self._size)
+        return chi.rvs(2, size=self._size, random_state=self._random_state)
 
     def _pdf(self, r):
         return r * exp(-0.5 * r**2)
 
     def _cdf(self, r):
-        return 1 - exp(-0.5 * r**2)
+        return -special.expm1(-0.5 * r**2)
 
     def _ppf(self, q):
-        return sqrt(-2 * log(1 - q))
+        return sqrt(-2 * special.log1p(-q))
+        
+    def _sf(self, r):
+        return exp(-0.5 * r**2)
+        
+    def _isf(self, q):
+        return sqrt(-2 * log(q))
 
     def _stats(self):
         val = 4 - pi
@@ -3598,7 +3628,7 @@ class rice_gen(rv_continuous):
     def _rvs(self, b):
         # http://en.wikipedia.org/wiki/Rice_distribution
         sz = self._size if self._size else 1
-        t = b/np.sqrt(2) + mtrand.standard_normal(size=(2, sz))
+        t = b/np.sqrt(2) + self._random_state.standard_normal(size=(2, sz))
         return np.sqrt((t*t).sum(axis=0))
 
     def _pdf(self, x, b):
@@ -3631,7 +3661,7 @@ class recipinvgauss_gen(rv_continuous):
 
     """
     def _rvs(self, mu):
-        return 1.0/mtrand.wald(mu, 1.0, size=self._size)
+        return 1.0/self._random_state.wald(mu, 1.0, size=self._size)
 
     def _pdf(self, x, mu):
         return 1.0/sqrt(2*pi*x)*exp(-(1-mu*x)**2.0 / (2*x*mu**2.0))
@@ -3696,7 +3726,7 @@ class triang_gen(rv_continuous):
 
     """
     def _rvs(self, c):
-        return mtrand.triangular(0, c, 1, self._size)
+        return self._random_state.triangular(0, c, 1, self._size)
 
     def _argcheck(self, c):
         return (c >= 0) & (c <= 1)
@@ -3740,24 +3770,24 @@ class truncexpon_gen(rv_continuous):
         return (b > 0)
 
     def _pdf(self, x, b):
-        return exp(-x)/(1-exp(-b))
+        return exp(-x)/(-special.expm1(-b))
 
     def _logpdf(self, x, b):
-        return -x - log(1-exp(-b))
+        return -x - log(-special.expm1(-b))
 
     def _cdf(self, x, b):
-        return (1.0-exp(-x))/(1-exp(-b))
+        return special.expm1(-x)/special.expm1(-b)
 
     def _ppf(self, q, b):
-        return -log(1-q+q*exp(-b))
+        return -special.log1p(q*special.expm1(-b))
 
     def _munp(self, n, b):
         # wrong answer with formula, same as in continuous.pdf
         # return gam(n+1)-special.gammainc(1+n, b)
         if n == 1:
-            return (1-(b+1)*exp(-b))/(-expm1(-b))
+            return (1-(b+1)*exp(-b))/(-special.expm1(-b))
         elif n == 2:
-            return 2*(1-0.5*(b*b+2*b+2)*exp(-b))/(-expm1(-b))
+            return 2*(1-0.5*(b*b+2*b+2)*exp(-b))/(-special.expm1(-b))
         else:
             # return generic for higher moments
             # return rv_continuous._mom1_sc(self, n, b)
@@ -3884,7 +3914,7 @@ class uniform_gen(rv_continuous):
 
     """
     def _rvs(self):
-        return mtrand.uniform(0.0, 1.0, self._size)
+        return self._random_state.uniform(0.0, 1.0, self._size)
 
     def _pdf(self, x):
         return 1.0*(x == x)
@@ -3928,7 +3958,7 @@ class vonmises_gen(rv_continuous):
 
     """
     def _rvs(self, kappa):
-        return mtrand.vonmises(0.0, kappa, size=self._size)
+        return self._random_state.vonmises(0.0, kappa, size=self._size)
 
     def _pdf(self, x, kappa):
         return exp(kappa * cos(x)) / (2*pi*special.i0(kappa))
@@ -3951,7 +3981,7 @@ class wald_gen(invgauss_gen):
     -----
     The probability density function for `wald` is::
 
-        wald.pdf(x, a) = 1/sqrt(2*pi*x**3) * exp(-(x-1)**2/(2*x))
+        wald.pdf(x) = 1/sqrt(2*pi*x**3) * exp(-(x-1)**2/(2*x))
 
     for ``x > 0``.
 
@@ -3960,7 +3990,7 @@ class wald_gen(invgauss_gen):
     %(example)s
     """
     def _rvs(self):
-        return mtrand.wald(1.0, 1.0, size=self._size)
+        return self._random_state.wald(1.0, 1.0, size=self._size)
 
     def _pdf(self, x):
         return invgauss._pdf(x, 1.0)
@@ -4027,3 +4057,10 @@ class wrapcauchy_gen(rv_continuous):
     def _entropy(self, c):
         return log(2*pi*(1-c*c))
 wrapcauchy = wrapcauchy_gen(a=0.0, b=2*pi, name='wrapcauchy')
+
+
+# Collect names of classes and objects in this module.
+pairs = list(globals().items())
+_distn_names, _distn_gen_names = get_distribution_names(pairs, rv_continuous)
+
+__all__ = _distn_names + _distn_gen_names

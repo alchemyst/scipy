@@ -10,7 +10,7 @@ import numpy as np
 from numpy.random import RandomState
 from numpy.testing import (TestCase, run_module_suite, assert_array_equal,
     assert_almost_equal, assert_array_less, assert_array_almost_equal,
-    assert_raises, assert_, assert_allclose, assert_equal, dec)
+    assert_raises, assert_, assert_allclose, assert_equal, dec, assert_warns)
 
 from scipy import stats
 
@@ -81,6 +81,123 @@ class TestAnderson(TestCase):
 
     def test_bad_arg(self):
         assert_raises(ValueError, stats.anderson, [1], dist='plate_of_shrimp')
+
+
+class TestAndersonKSamp(TestCase):
+    def test_example1a(self):
+        # Example data from Scholz & Stephens (1987), originally
+        # published in Lehmann (1995, Nonparametrics, Statistical
+        # Methods Based on Ranks, p. 309)
+        # Pass a mixture of lists and arrays
+        t1 = [38.7, 41.5, 43.8, 44.5, 45.5, 46.0, 47.7, 58.0]
+        t2 = np.array([39.2, 39.3, 39.7, 41.4, 41.8, 42.9, 43.3, 45.8])
+        t3 = np.array([34.0, 35.0, 39.0, 40.0, 43.0, 43.0, 44.0, 45.0])
+        t4 = np.array([34.0, 34.8, 34.8, 35.4, 37.2, 37.8, 41.2, 42.8])
+        assert_warns(UserWarning, stats.anderson_ksamp, (t1, t2, t3, t4),
+                     midrank=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='approximate p-value')
+            Tk, tm, p = stats.anderson_ksamp((t1, t2, t3, t4), midrank=False)
+
+        assert_almost_equal(Tk, 4.449, 3)
+        assert_array_almost_equal([0.4985, 1.3237, 1.9158, 2.4930, 3.2459],
+                                  tm, 4)
+        assert_almost_equal(p, 0.0021, 4)
+
+    def test_example1b(self):
+        # Example data from Scholz & Stephens (1987), originally
+        # published in Lehmann (1995, Nonparametrics, Statistical
+        # Methods Based on Ranks, p. 309)
+        # Pass arrays
+        t1 = np.array([38.7, 41.5, 43.8, 44.5, 45.5, 46.0, 47.7, 58.0])
+        t2 = np.array([39.2, 39.3, 39.7, 41.4, 41.8, 42.9, 43.3, 45.8])
+        t3 = np.array([34.0, 35.0, 39.0, 40.0, 43.0, 43.0, 44.0, 45.0])
+        t4 = np.array([34.0, 34.8, 34.8, 35.4, 37.2, 37.8, 41.2, 42.8])
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='approximate p-value')
+            Tk, tm, p = stats.anderson_ksamp((t1, t2, t3, t4), midrank=True)
+
+        assert_almost_equal(Tk, 4.480, 3)
+        assert_array_almost_equal([0.4985, 1.3237, 1.9158, 2.4930, 3.2459],
+                                  tm, 4)
+        assert_almost_equal(p, 0.0020, 4)
+
+    def test_example2a(self):
+        # Example data taken from an earlier technical report of
+        # Scholz and Stephens
+        # Pass lists instead of arrays
+        t1 = [194, 15, 41, 29, 33, 181]
+        t2 = [413, 14, 58, 37, 100, 65, 9, 169, 447, 184, 36, 201, 118]
+        t3 = [34, 31, 18, 18, 67, 57, 62, 7, 22, 34]
+        t4 = [90, 10, 60, 186, 61, 49, 14, 24, 56, 20, 79, 84, 44, 59, 29,
+              118, 25, 156, 310, 76, 26, 44, 23, 62]
+        t5 = [130, 208, 70, 101, 208]
+        t6 = [74, 57, 48, 29, 502, 12, 70, 21, 29, 386, 59, 27]
+        t7 = [55, 320, 56, 104, 220, 239, 47, 246, 176, 182, 33]
+        t8 = [23, 261, 87, 7, 120, 14, 62, 47, 225, 71, 246, 21, 42, 20, 5,
+              12, 120, 11, 3, 14, 71, 11, 14, 11, 16, 90, 1, 16, 52, 95]
+        t9 = [97, 51, 11, 4, 141, 18, 142, 68, 77, 80, 1, 16, 106, 206, 82,
+              54, 31, 216, 46, 111, 39, 63, 18, 191, 18, 163, 24]
+        t10 = [50, 44, 102, 72, 22, 39, 3, 15, 197, 188, 79, 88, 46, 5, 5, 36,
+               22, 139, 210, 97, 30, 23, 13, 14]
+        t11 = [359, 9, 12, 270, 603, 3, 104, 2, 438]
+        t12 = [50, 254, 5, 283, 35, 12]
+        t13 = [487, 18, 100, 7, 98, 5, 85, 91, 43, 230, 3, 130]
+        t14 = [102, 209, 14, 57, 54, 32, 67, 59, 134, 152, 27, 14, 230, 66,
+               61, 34]
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='approximate p-value')
+            Tk, tm, p = stats.anderson_ksamp((t1, t2, t3, t4, t5, t6, t7, t8,
+                                              t9, t10, t11, t12, t13, t14),
+                                             midrank=False)
+
+        assert_almost_equal(Tk, 3.288, 3)
+        assert_array_almost_equal([0.5990, 1.3269, 1.8052, 2.2486, 2.8009],
+                                  tm, 4)
+        assert_almost_equal(p, 0.0041, 4)
+
+    def test_example2b(self):
+        # Example data taken from an earlier technical report of
+        # Scholz and Stephens
+        t1 = [194, 15, 41, 29, 33, 181]
+        t2 = [413, 14, 58, 37, 100, 65, 9, 169, 447, 184, 36, 201, 118]
+        t3 = [34, 31, 18, 18, 67, 57, 62, 7, 22, 34]
+        t4 = [90, 10, 60, 186, 61, 49, 14, 24, 56, 20, 79, 84, 44, 59, 29,
+              118, 25, 156, 310, 76, 26, 44, 23, 62]
+        t5 = [130, 208, 70, 101, 208]
+        t6 = [74, 57, 48, 29, 502, 12, 70, 21, 29, 386, 59, 27]
+        t7 = [55, 320, 56, 104, 220, 239, 47, 246, 176, 182, 33]
+        t8 = [23, 261, 87, 7, 120, 14, 62, 47, 225, 71, 246, 21, 42, 20, 5,
+              12, 120, 11, 3, 14, 71, 11, 14, 11, 16, 90, 1, 16, 52, 95]
+        t9 = [97, 51, 11, 4, 141, 18, 142, 68, 77, 80, 1, 16, 106, 206, 82,
+              54, 31, 216, 46, 111, 39, 63, 18, 191, 18, 163, 24]
+        t10 = [50, 44, 102, 72, 22, 39, 3, 15, 197, 188, 79, 88, 46, 5, 5, 36,
+               22, 139, 210, 97, 30, 23, 13, 14]
+        t11 = [359, 9, 12, 270, 603, 3, 104, 2, 438]
+        t12 = [50, 254, 5, 283, 35, 12]
+        t13 = [487, 18, 100, 7, 98, 5, 85, 91, 43, 230, 3, 130]
+        t14 = [102, 209, 14, 57, 54, 32, 67, 59, 134, 152, 27, 14, 230, 66,
+               61, 34]
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='approximate p-value')
+            Tk, tm, p = stats.anderson_ksamp((t1, t2, t3, t4, t5, t6, t7, t8,
+                                              t9, t10, t11, t12, t13, t14),
+                                             midrank=True)
+
+        assert_almost_equal(Tk, 3.294, 3)
+        assert_array_almost_equal([0.5990, 1.3269, 1.8052, 2.2486, 2.8009],
+                                  tm, 4)
+        assert_almost_equal(p, 0.0041, 4)
+
+    def test_not_enough_samples(self):
+        assert_raises(ValueError, stats.anderson_ksamp, np.ones(5))
+
+    def test_no_distinct_observations(self):
+        assert_raises(ValueError, stats.anderson_ksamp,
+                      (np.ones(5), np.ones(5)))
+
+    def test_empty_sample(self):
+        assert_raises(ValueError, stats.anderson_ksamp, (np.ones(5), []))
 
 
 class TestAnsari(TestCase):
@@ -477,11 +594,24 @@ def test_mvsdist_bad_arg():
     assert_raises(ValueError, stats.mvsdist, data)
 
 
-def test_kstat_bad_arg():
-    # Raise ValueError if n > 4 or n > 1.
-    data = [1]
-    n = 10
-    assert_raises(ValueError, stats.kstat, data, n=n)
+class TestKstat(TestCase):
+    # Note: `kstat` still needs review.  Statistics Review issue gh-675.
+
+    def test_moments_normal_distribution(self):
+        np.random.seed(32149)
+        data = np.random.randn(12345)
+        moments = []
+        for n in [1, 2, 3, 4]:
+            moments.append(stats.kstat(data, n))
+
+        expected = [0.011315, 1.017931, 0.05811052, 0.0754134]
+        assert_allclose(moments, expected, rtol=1e-4)
+
+    def test_kstat_bad_arg(self):
+        # Raise ValueError if n > 4 or n < 1.
+        data = np.arange(10)
+        for n in [0, 4.001]:
+            assert_raises(ValueError, stats.kstat, data, n=n)
 
 
 def test_kstatvar_bad_arg():
@@ -592,11 +722,11 @@ class TestBoxcoxNormmax(TestCase):
 
     def test_pearsonr(self):
         maxlog = stats.boxcox_normmax(self.x)
-        assert_allclose(maxlog, 1.804465325046)
+        assert_allclose(maxlog, 1.804465, rtol=1e-6)
 
     def test_mle(self):
         maxlog = stats.boxcox_normmax(self.x, method='mle')
-        assert_allclose(maxlog, 1.758101454114)
+        assert_allclose(maxlog, 1.758101, rtol=1e-6)
 
         # Check that boxcox() uses 'mle'
         _, maxlog_boxcox = stats.boxcox(self.x)
@@ -604,7 +734,7 @@ class TestBoxcoxNormmax(TestCase):
 
     def test_all(self):
         maxlog_all = stats.boxcox_normmax(self.x, method='all')
-        assert_allclose(maxlog_all, [1.804465325046, 1.758101454114])
+        assert_allclose(maxlog_all, [1.804465, 1.758101], rtol=1e-6)
 
 
 class TestBoxcoxNormplot(TestCase):
@@ -638,7 +768,7 @@ class TestBoxcoxNormplot(TestCase):
         # `lb` has to be larger than `la`
         assert_raises(ValueError, stats.boxcox_normplot, self.x, 1, 0)
         # `x` can not contain negative values
-        assert_raises(ValueError, stats.boxcox_normplot, [-1, 1] , 0, 1)
+        assert_raises(ValueError, stats.boxcox_normplot, [-1, 1], 0, 1)
 
     def test_empty(self):
         assert_(stats.boxcox_normplot([], 0, 1).size == 0)
@@ -783,6 +913,109 @@ def test_wilcoxon_tie():
     expected_p = 0.001904195
     assert_equal(stat, 0)
     assert_allclose(p, expected_p, rtol=1e-6)
+
+
+class TestMedianTest(TestCase):
+
+    def test_bad_n_samples(self):
+        # median_test requires at least two samples.
+        assert_raises(ValueError, stats.median_test, [1, 2, 3])
+
+    def test_empty_sample(self):
+        # Each sample must contain at least one value.
+        assert_raises(ValueError, stats.median_test, [], [1, 2, 3])
+
+    def test_empty_when_ties_ignored(self):
+        # The grand median is 1, and all values in the first argument are
+        # equal to the grand median.  With ties="ignore", those values are
+        # ignored, which results in the first sample being (in effect) empty.
+        # This should raise a ValueError.
+        assert_raises(ValueError, stats.median_test,
+                      [1, 1, 1, 1], [2, 0, 1], [2, 0], ties="ignore")
+
+    def test_empty_contingency_row(self):
+        # The grand median is 1, and with the default ties="below", all the
+        # values in the samples are counted as being below the grand median.
+        # This would result a row of zeros in the contingency table, which is
+        # an error.
+        assert_raises(ValueError, stats.median_test, [1, 1, 1], [1, 1, 1])
+
+        # With ties="above", all the values are counted as above the
+        # grand median.
+        assert_raises(ValueError, stats.median_test, [1, 1, 1], [1, 1, 1],
+                      ties="above")
+
+    def test_bad_ties(self):
+        assert_raises(ValueError, stats.median_test, [1, 2, 3], [4, 5], ties="foo")
+
+    def test_bad_keyword(self):
+        assert_raises(TypeError, stats.median_test, [1, 2, 3], [4, 5], foo="foo")
+
+    def test_simple(self):
+        x = [1, 2, 3]
+        y = [1, 2, 3]
+        stat, p, med, tbl = stats.median_test(x, y)
+
+        # The median is floating point, but this equality test should be safe.
+        assert_equal(med, 2.0)
+
+        assert_array_equal(tbl, [[1, 1], [2, 2]])
+
+        # The expected values of the contingency table equal the contingency table,
+        # so the statistic should be 0 and the p-value should be 1.
+        assert_equal(stat, 0)
+        assert_equal(p, 1)
+
+    def test_ties_options(self):
+        # Test the contingency table calculation.
+        x = [1, 2, 3, 4]
+        y = [5, 6]
+        z = [7, 8, 9]
+        # grand median is 5.
+
+        # Default 'ties' option is "below".
+        stat, p, m, tbl = stats.median_test(x, y, z)
+        assert_equal(m, 5)
+        assert_equal(tbl, [[0, 1, 3], [4, 1, 0]])
+
+        stat, p, m, tbl = stats.median_test(x, y, z, ties="ignore")
+        assert_equal(m, 5)
+        assert_equal(tbl, [[0, 1, 3], [4, 0, 0]])
+
+        stat, p, m, tbl = stats.median_test(x, y, z, ties="above")
+        assert_equal(m, 5)
+        assert_equal(tbl, [[0, 2, 3], [4, 0, 0]])
+
+    def test_basic(self):
+        # median_test calls chi2_contingency to compute the test statistic
+        # and p-value.  Make sure it hasn't screwed up the call...
+
+        x = [1, 2, 3, 4, 5]
+        y = [2, 4, 6, 8]
+
+        stat, p, m, tbl = stats.median_test(x, y)
+        assert_equal(m, 4)
+        assert_equal(tbl, [[1, 2], [4, 2]])
+
+        exp_stat, exp_p, dof, e = stats.chi2_contingency(tbl)
+        assert_allclose(stat, exp_stat)
+        assert_allclose(p, exp_p)
+
+        stat, p, m, tbl = stats.median_test(x, y, lambda_=0)
+        assert_equal(m, 4)
+        assert_equal(tbl, [[1, 2], [4, 2]])
+
+        exp_stat, exp_p, dof, e = stats.chi2_contingency(tbl, lambda_=0)
+        assert_allclose(stat, exp_stat)
+        assert_allclose(p, exp_p)
+
+        stat, p, m, tbl = stats.median_test(x, y, correction=False)
+        assert_equal(m, 4)
+        assert_equal(tbl, [[1, 2], [4, 2]])
+
+        exp_stat, exp_p, dof, e = stats.chi2_contingency(tbl, correction=False)
+        assert_allclose(stat, exp_stat)
+        assert_allclose(p, exp_p)
 
 
 if __name__ == "__main__":

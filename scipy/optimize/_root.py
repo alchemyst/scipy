@@ -11,12 +11,13 @@ __all__ = ['root']
 
 import numpy as np
 
-from scipy.lib.six import callable
+from scipy._lib.six import callable
 
 from warnings import warn
 
 from .optimize import MemoizeJac, OptimizeResult, _check_unknown_options
 from .minpack import _root_hybr, leastsq
+from ._spectral import _root_df_sane
 from . import nonlin
 
 
@@ -24,8 +25,6 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
          options=None):
     """
     Find a root of a vector function.
-
-    .. versionadded:: 0.11.0
 
     Parameters
     ----------
@@ -47,6 +46,7 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
             - 'diagbroyden'
             - 'excitingmixing'
             - 'krylov'
+            - 'df-sane'
 
     jac : bool or callable, optional
         If `jac` is a Boolean and is True, `fun` is assumed to return the
@@ -90,6 +90,8 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
     sense using a modification of the Levenberg-Marquardt algorithm as
     implemented in MINPACK [1]_.
 
+    Method *df-sane* is a derivative-free spectral method. [3]_
+
     Methods *broyden1*, *broyden2*, *anderson*, *linearmixing*,
     *diagbroyden*, *excitingmixing*, *krylov* are inexact Newton methods,
     with backtracking or full line searches [2]_. Each method corresponds
@@ -114,6 +116,8 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
         problems, but whether they will work may depend strongly on the
         problem.
 
+    .. versionadded:: 0.11.0
+
     References
     ----------
     .. [1] More, Jorge J., Burton S. Garbow, and Kenneth E. Hillstrom.
@@ -121,6 +125,7 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
     .. [2] C. T. Kelley. 1995. Iterative Methods for Linear and Nonlinear
         Equations. Society for Industrial and Applied Mathematics.
         <http://www.siam.org/books/kelley/>
+    .. [3] W. La Cruz, J.M. Martinez, M. Raydan. Math. Comp. 75, 1429 (2006).
 
     Examples
     --------
@@ -144,6 +149,9 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
     >>> sol.x
     array([ 0.8411639,  0.1588361])
     """
+    if not isinstance(args, tuple):
+        args = (args,)
+
     meth = method.lower()
     if options is None:
         options = {}
@@ -165,6 +173,8 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
         options = dict(options)
         if meth in ('hybr', 'lm'):
             options.setdefault('xtol', tol)
+        elif meth in ('df-sane',):
+            options.setdefault('ftol', tol)
         elif meth in ('broyden1', 'broyden2', 'anderson', 'linearmixing',
                       'diagbroyden', 'excitingmixing', 'krylov'):
             options.setdefault('xtol', tol)
@@ -176,11 +186,13 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
         sol = _root_hybr(fun, x0, args=args, jac=jac, **options)
     elif meth == 'lm':
         sol = _root_leastsq(fun, x0, args=args, jac=jac, **options)
+    elif meth == 'df-sane':
+        _warn_jac_unused(jac, method)
+        sol = _root_df_sane(fun, x0, args=args, callback=callback,
+                            **options)
     elif meth in ('broyden1', 'broyden2', 'anderson', 'linearmixing',
                   'diagbroyden', 'excitingmixing', 'krylov'):
-        if jac is not None:
-            warn('Method %s does not use the jacobian (jac).' % method,
-                 RuntimeWarning)
+        _warn_jac_unused(jac, method)
         sol = _root_nonlin_solve(fun, x0, args=args, jac=jac,
                                  _method=meth, _callback=callback,
                                  **options)
@@ -188,6 +200,12 @@ def root(fun, x0, args=(), method='hybr', jac=None, tol=None, callback=None,
         raise ValueError('Unknown solver %s' % method)
 
     return sol
+
+
+def _warn_jac_unused(jac, method):
+    if jac is not None:
+        warn('Method %s does not use the jacobian (jac).' % (method,),
+             RuntimeWarning)
 
 
 def _root_leastsq(func, x0, args=(), jac=None,
@@ -234,7 +252,7 @@ def _root_nonlin_solve(func, x0, args=(), jac=None,
                 }[_method]
 
     if args:
-        if jac == True:
+        if jac:
             def f(x):
                 return func(x, *args)[0]
         else:

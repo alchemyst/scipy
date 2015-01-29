@@ -1,9 +1,12 @@
 """The suite of window functions."""
 from __future__ import division, print_function, absolute_import
 
+import warnings
+
 import numpy as np
 from scipy import special, linalg
 from scipy.fftpack import fft
+from scipy._lib.six import string_types
 
 __all__ = ['boxcar', 'triang', 'parzen', 'bohman', 'blackman', 'nuttall',
            'blackmanharris', 'flattop', 'bartlett', 'hanning', 'barthann',
@@ -642,7 +645,7 @@ def hann(M, sym=True):
     .. math::  w(n) = 0.5 - 0.5 \cos\left(\frac{2\pi{n}}{M-1}\right)
                \qquad 0 \leq n \leq M-1
 
-    The window was named for Julius van Hann, an Austrian meterologist. It is
+    The window was named for Julius van Hann, an Austrian meteorologist. It is
     also known as the Cosine Bell. It is sometimes erroneously referred to as
     the "Hanning" window, from the use of "hann" as a verb in the original
     paper and confusion with the very similar Hamming window.
@@ -1200,6 +1203,13 @@ def chebwin(M, at, sym=True):
     >>> plt.xlabel("Normalized frequency [cycles per sample]")
 
     """
+    if np.abs(at) < 45:
+        warnings.warn("This window is not suitable for spectral analysis "
+                      "for attenuation values lower than about 45dB because "
+                      "the equivalent noise bandwidth of a Chebyshev window "
+                      "does not grow monotonically with increasing sidelobe "
+                      "attenuation when the attenuation is smaller than "
+                      "about 45 dB.")
     if M < 1:
         return np.array([])
     if M == 1:
@@ -1227,14 +1237,14 @@ def chebwin(M, at, sym=True):
     if M % 2:
         w = np.real(fft(p))
         n = (M + 1) // 2
-        w = w[:n] / w[0]
+        w = w[:n]
         w = np.concatenate((w[n - 1:0:-1], w))
     else:
         p = p * np.exp(1.j * np.pi / M * np.r_[0:M])
         w = np.real(fft(p))
         n = M // 2 + 1
-        w = w / w[1]
         w = np.concatenate((w[n - 1:0:-1], w[1:n]))
+    w = w / max(w)
     if not sym and not odd:
         w = w[:-1]
     return w
@@ -1288,9 +1298,6 @@ def slepian(M, width, sym=True):
     >>> plt.xlabel("Normalized frequency [cycles per sample]")
 
     """
-    if (M * width > 27.38):
-        raise ValueError("Cannot reliably obtain Slepian sequences for"
-              " M*width > 27.38.")
     if M < 1:
         return np.array([])
     if M == 1:
@@ -1299,26 +1306,25 @@ def slepian(M, width, sym=True):
     if not sym and not odd:
         M = M + 1
 
-    twoF = width / 2.0
-    alpha = (M - 1) / 2.0
-    m = np.arange(0, M) - alpha
-    n = m[:, np.newaxis]
-    k = m[np.newaxis, :]
-    AF = twoF * special.sinc(twoF * (n - k))
-    [lam, vec] = linalg.eig(AF)
-    ind = np.argmax(abs(lam), axis=-1)
-    w = np.abs(vec[:, ind])
-    w = w / max(w)
+    # our width is the full bandwidth
+    width = width / 2
+    # to match the old version 
+    width = width / 2
+    m = np.arange(M, dtype='d')
+    H = np.zeros((2, M))
+    H[0, 1:] = m[1:] * (M - m[1:]) / 2
+    H[1, :] = ((M - 1 - 2 * m) / 2)**2 * np.cos(2 * np.pi * width)
+
+    _, win = linalg.eig_banded(H, select='i', select_range=(M-1, M-1))
+    win = win.ravel() / win.max()
 
     if not sym and not odd:
-        w = w[:-1]
-    return w
+        win = win[:-1]
+    return win
 
 
 def cosine(M, sym=True):
     """Return a window with a simple cosine shape.
-
-    .. versionadded:: 0.13.0
 
     Parameters
     ----------
@@ -1335,6 +1341,11 @@ def cosine(M, sym=True):
     w : ndarray
         The window, with the maximum value normalized to 1 (though the value 1
         does not appear if `M` is even and `sym` is True).
+
+    Notes
+    -----
+
+    .. versionadded:: 0.13.0
 
     Examples
     --------
@@ -1442,16 +1453,19 @@ def get_window(window, Nx, fftbins=True):
             winstr = window[0]
             if len(window) > 1:
                 args = window[1:]
-        elif isinstance(window, str):
+        elif isinstance(window, string_types):
             if window in ['kaiser', 'ksr', 'gaussian', 'gauss', 'gss',
-                        'general gaussian', 'general_gaussian',
-                        'general gauss', 'general_gauss', 'ggs',
-                        'slepian', 'optimal', 'slep', 'dss',
-                        'chebwin', 'cheb']:
+                          'general gaussian', 'general_gaussian',
+                          'general gauss', 'general_gauss', 'ggs',
+                          'slepian', 'optimal', 'slep', 'dss',
+                          'chebwin', 'cheb']:
                 raise ValueError("The '" + window + "' window needs one or "
-                                    "more parameters  -- pass a tuple.")
+                                 "more parameters  -- pass a tuple.")
             else:
                 winstr = window
+        else:
+            raise ValueError("%s as window type is not supported." %
+                             str(type(window)))
 
         if winstr in ['blackman', 'black', 'blk']:
             winfunc = blackman

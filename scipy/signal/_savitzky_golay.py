@@ -51,6 +51,11 @@ def savgol_coeffs(window_length, polyorder, deriv=0, delta=1.0, pos=None,
     --------
     savgol_filter
 
+    Notes
+    -----
+
+    .. versionadded:: 0.14.0
+
     Examples
     --------
     >>> savgol_coeffs(5, 2)
@@ -115,8 +120,14 @@ def savgol_coeffs(window_length, polyorder, deriv=0, delta=1.0, pos=None,
     if use == "conv":
         # Reverse so that result can be used in a convolution.
         x = x[::-1]
+
     order = np.arange(polyorder + 1).reshape(-1, 1)
-    A = x ** order
+    if order.size == 1:
+        # Avoid spurious DeprecationWarning in numpy 1.8.0 for
+        # ``[1] ** [[2]]``, see numpy gh-4145.
+        A = np.atleast_2d(x ** order[0, 0])
+    else:
+        A = x ** order
 
     # y determines which order derivative is returned.
     y = np.zeros(polyorder + 1)
@@ -289,6 +300,8 @@ def savgol_filter(x, window_length, polyorder, deriv=0, delta=1.0,
         'nearest'  | 1  1  1 | 1  2  3  4  5  6  7  8 | 8  8  8
         'constant' | 0  0  0 | 1  2  3  4  5  6  7  8 | 0  0  0
         'wrap'     | 6  7  8 | 1  2  3  4  5  6  7  8 | 1  2  3
+
+    .. versionadded:: 0.14.0
 
     Examples
     --------

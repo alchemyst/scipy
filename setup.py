@@ -48,11 +48,11 @@ Operating System :: MacOS
 
 """
 
-MAJOR               = 0
-MINOR               = 14
-MICRO               = 0
-ISRELEASED          = False
-VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
+MAJOR = 0
+MINOR = 16
+MICRO = 0
+ISRELEASED = False
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 
 # Return the git revision as a string
@@ -108,7 +108,7 @@ def get_version_info():
         GIT_REVISION = "Unknown"
 
     if not ISRELEASED:
-        FULLVERSION += '.dev-' + GIT_REVISION[:7]
+        FULLVERSION += '.dev+' + GIT_REVISION[:7]
 
     return FULLVERSION, GIT_REVISION
 
@@ -130,8 +130,8 @@ if not release:
     a = open(filename, 'w')
     try:
         a.write(cnt % {'version': VERSION,
-                       'full_version' : FULLVERSION,
-                       'git_revision' : GIT_REVISION,
+                       'full_version': FULLVERSION,
+                       'git_revision': GIT_REVISION,
                        'isrelease': str(ISRELEASED)})
     finally:
         a.close()
@@ -179,13 +179,23 @@ def configuration(parent_package='',top_path=None):
 
 def setup_package():
 
-    # Rewrite the version file everytime
+    # Rewrite the version file every time
     write_version_py()
 
     if HAVE_SPHINX:
         cmdclass = {'build_sphinx': ScipyBuildDoc}
     else:
         cmdclass = {}
+
+    # Figure out whether to add ``*_requires = ['numpy']``.
+    # We don't want to do that unconditionally, because we risk updating
+    # an installed numpy which fails too often.  Just if it's not installed, we
+    # may give it a try.  See gh-3379.
+    build_requires = []
+    try:
+        import numpy
+    except:
+        build_requires = ['numpy>=1.5.1']
 
     metadata = dict(
         name = 'scipy',
@@ -200,6 +210,8 @@ def setup_package():
         classifiers=[_f for _f in CLASSIFIERS.split('\n') if _f],
         platforms = ["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         test_suite='nose.collector',
+        setup_requires = build_requires,
+        install_requires = build_requires,
     )
 
     if len(sys.argv) >= 2 and ('--help' in sys.argv[1:] or

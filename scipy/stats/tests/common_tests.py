@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 import numpy.testing as npt
 
-from scipy.lib._version import NumpyVersion
+from scipy._lib._version import NumpyVersion
 from scipy import stats
 
 
@@ -141,7 +141,7 @@ def check_named_args(distfn, x, shape_args, defaults, meths):
         k.update({names.pop(): a.pop()})
         v = [meth(x, *a, **k) for meth in meths]
         npt.assert_array_equal(vals, v)
-        if not 'n' in k.keys():
+        if 'n' not in k.keys():
             # `n` is first parameter of moment(), so can't be used as named arg
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
@@ -151,3 +151,38 @@ def check_named_args(distfn, x, shape_args, defaults, meths):
     # unknown arguments should not go through:
     k.update({'kaboom': 42})
     npt.assert_raises(TypeError, distfn.cdf, x, **k)
+
+
+def check_random_state_property(distfn, args):
+    # check the random_state attribute of a distribution *instance*
+
+    # This test fiddles with distfn.random_state. This breaks other tests,
+    # hence need to save it and then restore.
+    rndm = distfn.random_state
+
+    # baseline: this relies on the global state
+    np.random.seed(1234)
+    distfn.random_state = None
+    r0 = distfn.rvs(*args, size=8)
+
+    # use an explicit instance-level random_state
+    distfn.random_state = 1234
+    r1 = distfn.rvs(*args, size=8)
+    npt.assert_equal(r0, r1)
+    
+    distfn.random_state = np.random.RandomState(1234)
+    r2 = distfn.rvs(*args, size=8)
+    npt.assert_equal(r0, r2)
+
+    # can override the instance-level random_state for an individual .rvs call
+    distfn.random_state = 2
+    orig_state = distfn.random_state.get_state()
+
+    r3 = distfn.rvs(*args, size=8, random_state=np.random.RandomState(1234))
+    npt.assert_equal(r0, r3)
+
+    # ... and that does not alter the instance-level random_state!
+    npt.assert_equal(distfn.random_state.get_state(), orig_state)
+
+    # finally, restore the random_state
+    distfn.random_state = rndm

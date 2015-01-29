@@ -12,11 +12,11 @@ import math
 import warnings
 
 import numpy as np
-from numpy import array, eye, dot, sqrt, double, exp, random
+from numpy import array, eye, exp, random
 from numpy.linalg import matrix_power
 from numpy.testing import (TestCase, run_module_suite,
         assert_allclose, assert_, assert_array_almost_equal, assert_equal,
-        assert_array_equal, assert_array_almost_equal_nulp, decorators)
+        assert_array_almost_equal_nulp)
 
 from scipy.sparse import csc_matrix, SparseEfficiencyWarning
 from scipy.sparse.construct import eye as speye
@@ -24,7 +24,7 @@ from scipy.sparse.linalg.matfuncs import (expm,
         ProductOperator, MatrixPowerOperator,
         _onenorm_matrix_power_nnm)
 from scipy.linalg import logm
-from scipy.misc import factorial
+from scipy.special import factorial
 import scipy.sparse
 import scipy.sparse.linalg
 
@@ -84,6 +84,19 @@ class TestExpM(TestCase):
     def test_zero_matrix(self):
         a = np.matrix([[0.,0],[0,0]])
         assert_array_almost_equal(expm(a),[[1,0],[0,1]])
+
+    def test_misc_types(self):
+        A = expm(np.array([[1]]))
+        yield assert_allclose, expm(((1,),)), A
+        yield assert_allclose, expm([[1]]), A
+        yield assert_allclose, expm(np.matrix([[1]])), A
+        yield assert_allclose, expm(np.array([[1]])), A
+        yield assert_allclose, expm(csc_matrix([[1]])), A
+        B = expm(np.array([[1j]]))
+        yield assert_allclose, expm(((1j,),)), B
+        yield assert_allclose, expm([[1j]]), B
+        yield assert_allclose, expm(np.matrix([[1j]])), B
+        yield assert_allclose, expm(csc_matrix([[1j]])), B
 
     def test_bidiagonal_sparse(self):
         A = csc_matrix([
@@ -146,6 +159,14 @@ class TestExpM(TestCase):
                         A = A + 1j * random.rand(n, n) * scale
                     assert_array_almost_equal(expm(logm(A)), A)
 
+    def test_integer_matrix(self):
+        Q = np.array([
+            [-3, 1, 1, 1],
+            [1, -3, 1, 1],
+            [1, 1, -3, 1],
+            [1, 1, 1, -3]])
+        assert_allclose(expm(Q), expm(1.0 * Q))
+
     def test_triangularity_perturbation(self):
         # Experiment (1) of
         # Awad H. Al-Mohy and Nicholas J. Higham (2012)
@@ -173,7 +194,6 @@ class TestExpM(TestCase):
         # so that it becomes technically not upper triangular.
         random.seed(1234)
         tiny = 1e-17
-        n = 4
         A_logm_perturbed = A_logm.copy()
         A_logm_perturbed[1, 0] = tiny
         A_expm_logm_perturbed = expm(A_logm_perturbed)

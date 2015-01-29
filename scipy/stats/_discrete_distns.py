@@ -5,21 +5,14 @@
 from __future__ import division, print_function, absolute_import
 
 from scipy import special
-from scipy.special import gammaln as gamln
+from scipy.special import entr, gammaln as gamln
 
 from numpy import floor, ceil, log, exp, sqrt, log1p, expm1, tanh, cosh, sinh
 
 import numpy as np
-import numpy.random as mtrand
 
 from ._distn_infrastructure import (
-        rv_discrete, _lazywhere, _ncx2_pdf, _ncx2_cdf)
-
-__all__ = [
-        'binom', 'bernoulli', 'nbinom', 'geom', 'hypergeom',
-        'logser', 'poisson', 'planck', 'boltzmann', 'randint',
-        'zipf', 'dlaplace', 'skellam'
-        ]
+        rv_discrete, _lazywhere, _ncx2_pdf, _ncx2_cdf, get_distribution_names)
 
 
 class binom_gen(rv_discrete):
@@ -41,7 +34,7 @@ class binom_gen(rv_discrete):
 
     """
     def _rvs(self, n, p):
-        return mtrand.binomial(n, p, self._size)
+        return self._random_state.binomial(n, p, self._size)
 
     def _argcheck(self, n, p):
         self.b = n
@@ -66,23 +59,25 @@ class binom_gen(rv_discrete):
 
     def _ppf(self, q, n, p):
         vals = ceil(special.bdtrik(q, n, p))
-        vals1 = vals-1
+        vals1 = np.maximum(vals - 1, 0)
         temp = special.bdtr(vals1, n, p)
         return np.where(temp >= q, vals1, vals)
 
-    def _stats(self, n, p):
-        q = 1.0-p
+    def _stats(self, n, p, moments='mv'):
+        q = 1.0 - p
         mu = n * p
         var = n * p * q
-        g1 = (q-p) / sqrt(n*p*q)
-        g2 = (1.0-6*p*q)/(n*p*q)
+        g1, g2 = None, None
+        if 's' in moments:
+            g1 = (q - p) / sqrt(var)
+        if 'k' in moments:
+            g2 = (1.0 - 6*p*q) / var
         return mu, var, g1, g2
 
     def _entropy(self, n, p):
         k = np.r_[0:n + 1]
         vals = self._pmf(k, n, p)
-        h = -np.sum(special.xlogy(vals, vals), axis=0)
-        return h
+        return np.sum(entr(vals), axis=0)
 binom = binom_gen(name='binom')
 
 
@@ -130,8 +125,7 @@ class bernoulli_gen(binom_gen):
         return binom._stats(1, p)
 
     def _entropy(self, p):
-        h = -special.xlogy(p, p) - special.xlogy(1 - p, 1 - p)
-        return h
+        return entr(p) + entr(1-p)
 bernoulli = bernoulli_gen(b=1, name='bernoulli')
 
 
@@ -154,17 +148,17 @@ class nbinom_gen(rv_discrete):
 
     """
     def _rvs(self, n, p):
-        return mtrand.negative_binomial(n, p, self._size)
+        return self._random_state.negative_binomial(n, p, self._size)
 
     def _argcheck(self, n, p):
-        return (n >= 0) & (p >= 0) & (p <= 1)
+        return (n > 0) & (p >= 0) & (p <= 1)
 
     def _pmf(self, x, n, p):
         return exp(self._logpmf(x, n, p))
 
     def _logpmf(self, x, n, p):
         coeff = gamln(n+x) - gamln(x+1) - gamln(n)
-        return coeff + n*log(p) + x*log(1-p)
+        return coeff + n*log(p) + special.xlog1py(x, -p)
 
     def _cdf(self, x, n, p):
         k = floor(x)
@@ -211,7 +205,7 @@ class geom_gen(rv_discrete):
 
     """
     def _rvs(self, p):
-        return mtrand.geometric(p, size=self._size)
+        return self._random_state.geometric(p, size=self._size)
 
     def _argcheck(self, p):
         return (p <= 1) & (p >= 0)
@@ -220,7 +214,7 @@ class geom_gen(rv_discrete):
         return np.power(1-p, k-1) * p
 
     def _logpmf(self, k, p):
-        return (k-1) * log(1-p) + log(p)
+        return special.xlog1py(k - 1, -p) + log(p)
 
     def _cdf(self, x, p):
         k = floor(x)
@@ -268,6 +262,7 @@ class hypergeom_gen(rv_discrete):
     Examples
     --------
     >>> from scipy.stats import hypergeom
+    >>> import matplotlib.pyplot as plt
 
     Suppose we have a collection of 20 animals, of which 7 are dogs.  Then if
     we want to know the probability of finding a given number of dogs if we
@@ -299,10 +294,10 @@ class hypergeom_gen(rv_discrete):
 
     """
     def _rvs(self, M, n, N):
-        return mtrand.hypergeometric(n, M-n, N, size=self._size)
+        return self._random_state.hypergeometric(n, M-n, N, size=self._size)
 
     def _argcheck(self, M, n, N):
-        cond = rv_discrete._argcheck(self, M, n, N)
+        cond = (M > 0) & (n >= 0) & (N >= 0)
         cond &= (n <= M) & (N <= M)
         self.a = max(N-(M-n), 0)
         self.b = min(n, N)
@@ -340,8 +335,7 @@ class hypergeom_gen(rv_discrete):
     def _entropy(self, M, n, N):
         k = np.r_[N - (M - n):min(n, N) + 1]
         vals = self.pmf(k, M, n, N)
-        h = -np.sum(special.xlogy(vals, vals), axis=0)
-        return h
+        return np.sum(entr(vals), axis=0)
 
     def _sf(self, k, M, n, N):
         """More precise calculation, 1 - cdf doesn't cut it."""
@@ -381,7 +375,7 @@ class logser_gen(rv_discrete):
     def _rvs(self, p):
         # looks wrong for p>0.5, too few k=1
         # trying to use generic is worse, no k=1 at all
-        return mtrand.logseries(p, size=self._size)
+        return self._random_state.logseries(p, size=self._size)
 
     def _argcheck(self, p):
         return (p > 0) & (p < 1)
@@ -425,7 +419,7 @@ class poisson_gen(rv_discrete):
 
     """
     def _rvs(self, mu):
-        return mtrand.poisson(mu, self._size)
+        return self._random_state.poisson(mu, self._size)
 
     def _logpmf(self, k, mu):
         Pk = k*log(mu)-gamln(k+1) - mu
@@ -444,9 +438,9 @@ class poisson_gen(rv_discrete):
 
     def _ppf(self, q, mu):
         vals = ceil(special.pdtrik(q, mu))
-        vals1 = vals - 1
+        vals1 = np.maximum(vals - 1, 0)
         temp = special.pdtr(vals1, mu)
-        return np.where((temp >= q), vals1, vals)
+        return np.where(temp >= q, vals1, vals)
 
     def _stats(self, mu):
         var = mu
@@ -618,7 +612,7 @@ class randint_gen(rv_discrete):
 
         If ``high`` is ``None``, then range is >=0  and < low
         """
-        return mtrand.randint(low, high, self._size)
+        return self._random_state.randint(low, high, self._size)
 
     def _entropy(self, low, high):
         return log(high - low)
@@ -646,7 +640,7 @@ class zipf_gen(rv_discrete):
 
     """
     def _rvs(self, a):
-        return mtrand.zipf(a, size=self._size)
+        return self._random_state.zipf(a, size=self._size)
 
     def _argcheck(self, a):
         return a > 1
@@ -737,7 +731,8 @@ class skellam_gen(rv_discrete):
     """
     def _rvs(self, mu1, mu2):
         n = self._size
-        return mtrand.poisson(mu1, n) - mtrand.poisson(mu2, n)
+        return (self._random_state.poisson(mu1, n) -
+                self._random_state.poisson(mu2, n))
 
     def _pmf(self, x, mu1, mu2):
         px = np.where(x < 0,
@@ -760,3 +755,10 @@ class skellam_gen(rv_discrete):
         g2 = 1 / var
         return mean, var, g1, g2
 skellam = skellam_gen(a=-np.inf, name="skellam", longname='A Skellam')
+
+
+# Collect names of classes and objects in this module.
+pairs = list(globals().items())
+_distn_names, _distn_gen_names = get_distribution_names(pairs, rv_discrete)
+
+__all__ = _distn_names + _distn_gen_names

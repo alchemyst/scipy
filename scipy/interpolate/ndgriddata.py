@@ -27,6 +27,10 @@ class NearestNDInterpolator(NDInterpolatorBase):
 
     .. versionadded:: 0.9
 
+    Methods
+    -------
+    __call__
+
     Parameters
     ----------
     points : (Npoints, Ndims) ndarray of floats
@@ -63,7 +67,7 @@ class NearestNDInterpolator(NDInterpolatorBase):
             Points where to interpolate data at.
 
         """
-        xi = _ndim_coords_from_arrays(args)
+        xi = _ndim_coords_from_arrays(args, ndim=self.points.shape[1])
         xi = self._check_call_shape(xi)
         xi = self._scale_x(xi)
         dist, i = self.tree.query(xi)
@@ -78,8 +82,6 @@ def griddata(points, values, xi, method='linear', fill_value=np.nan,
              rescale=False):
     """
     Interpolate unstructured D-dimensional data.
-
-    .. versionadded:: 0.9
 
     Parameters
     ----------
@@ -124,6 +126,10 @@ def griddata(points, values, xi, method='linear', fill_value=np.nan,
 
         .. versionadded:: 0.14.0
 
+    Notes
+    -----
+
+    .. versionadded:: 0.9
 
     Examples
     --------

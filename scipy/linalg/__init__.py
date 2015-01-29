@@ -26,6 +26,7 @@ Basics
    solve_banded - Solve a banded linear system
    solveh_banded - Solve a Hermitian or symmetric banded system
    solve_triangular - Solve a triangular matrix
+   solve_toeplitz - Solve a toeplitz matrix
    det - Find the determinant of a square matrix
    norm - Matrix and vector norm
    lstsq - Solve a linear least-squares problem
@@ -35,6 +36,7 @@ Basics
    kron - Kronecker product of two arrays
    tril - Construct a lower-triangular matrix from a given matrix
    triu - Construct an upper-triangular matrix from a given matrix
+   orthogonal_procrustes - Solve an orthogonal Procrustes problem
 
 Eigenvalue Problems
 ===================
@@ -70,6 +72,7 @@ Decompositions
    polar - Compute the polar decomposition.
    qr - QR decomposition of a matrix
    qr_multiply - QR decomposition and multiplication by Q
+   rq - RQ decomposition of a matrix
    qz - QZ decomposition of a pair of matrices
    schur - Schur decomposition of a matrix
    rsf2csf - Real to complex Schur form
@@ -98,6 +101,7 @@ Matrix Functions
    sqrtm - Matrix square root
    funm - Evaluating an arbitrary matrix function
    expm_frechet - Frechet derivative of the matrix exponential
+   expm_cond - Relative condition number of expm in the Frobenius norm
    fractional_matrix_power - Fractional matrix power
 
 
@@ -130,6 +134,7 @@ Special Matrices
    invhilbert - Inverse Hilbert matrix
    leslie - Leslie matrix
    pascal - Pascal matrix
+   invpascal - Inverse Pascal matrix
    toeplitz - Toeplitz matrix
    tri - Construct a matrix filled with ones at and below a given diagonal
 
@@ -170,6 +175,7 @@ from .blas import *
 from .lapack import *
 from .special_matrices import *
 from ._solvers import *
+from ._procrustes import *
 
 __all__ = [s for s in dir() if not s.startswith('_')]
 

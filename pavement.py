@@ -1,5 +1,5 @@
 """
-This paver file is intented to help with the release process as much as
+This paver file is intended to help with the release process as much as
 possible. It relies on virtualenv to generate 'bootstrap' environments as
 independent from the user system as possible (e.g. to make sure the sphinx doc
 is built against the built scipy, not an installed one).
@@ -66,10 +66,8 @@ import subprocess
 import re
 import shutil
 import warnings
-try:
-    from hash import md5
-except ImportError:
-    import md5
+from hashlib import md5
+from hashlib import sha256
 
 import distutils
 
@@ -112,10 +110,10 @@ finally:
 #-----------------------------------
 
 # Source of the release notes
-RELEASE = 'doc/release/0.14.0-notes.rst'
+RELEASE = 'doc/release/0.15.0-notes.rst'
 
 # Start/end of the log (from git)
-LOG_START = 'v0.13.0'
+LOG_START = 'v0.14.0'
 LOG_END = 'master'
 
 
@@ -145,17 +143,18 @@ options(bootstrap=Bunch(bootstrap_dir="bootstrap"),
         bdist_wininst_simple=Bunch(python_version=PYVER),)
 
 # Where we can find BLAS/LAPACK/ATLAS on Windows/Wine
-SITECFG = {"sse3" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\lib\yop\sse3'},
-           "sse2" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\lib\yop\sse2'},
-           "nosse" : {'ATLAS': 'None', 'BLAS': r'C:\local\lib\yop\nosse',
-                      'LAPACK': r'C:\local\lib\yop\nosse'}}
+SITECFG = {"sse3" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\vendor\binaries\sse3'},
+           "sse2" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\vendor\binaries\sse2'},
+           "nosse" : {'ATLAS': 'None', 'BLAS': r'C:\local\vendor\binaries\nosse',
+                      'LAPACK': r'C:\local\vendor\binaries\nosse'}}
 
 # Wine config for win32 builds
 if sys.platform == "win32":
-    WINE_PY26 = [r"C:\Python26\python26.exe"]
-    WINE_PY27 = [r"C:\Python27\python27.exe"]
+    WINE_PY26 = [r"C:\Python26\python.exe"]
+    WINE_PY27 = [r"C:\Python27\python.exe"]
     WINE_PY32 = [r"C:\Python32\python.exe"]
     WINE_PY33 = [r"C:\Python33\python.exe"]
+    WINE_PY34 = [r"C:\Python34\python.exe"]
     WINDOWS_ENV = os.environ
     MAKENSIS = ["makensis"]
 elif sys.platform == "darwin":
@@ -163,6 +162,7 @@ elif sys.platform == "darwin":
     WINE_PY27 = ["wine", os.environ['HOME'] + "/.wine/drive_c/Python27/python.exe"]
     WINE_PY32 = ["wine", os.environ['HOME'] + "/.wine/drive_c/Python32/python.exe"]
     WINE_PY33 = ["wine", os.environ['HOME'] + "/.wine/drive_c/Python33/python.exe"]
+    WINE_PY34 = ["wine", os.environ['HOME'] + "/.wine/drive_c/Python34/python.exe"]
     WINDOWS_ENV = os.environ
     WINDOWS_ENV["DYLD_FALLBACK_LIBRARY_PATH"] = "/usr/X11/lib:/usr/lib"
     MAKENSIS = ["wine", "makensis"]
@@ -171,9 +171,10 @@ else:
     WINE_PY27 = [os.environ['HOME'] + "/.wine/drive_c/Python27/python.exe"]
     WINE_PY32 = [os.environ['HOME'] + "/.wine/drive_c/Python32/python.exe"],
     WINE_PY33 = [os.environ['HOME'] + "/.wine/drive_c/Python33/python.exe"],
+    WINE_PY34 = [os.environ['HOME'] + "/.wine/drive_c/Python34/python.exe"],
     WINDOWS_ENV = os.environ
     MAKENSIS = ["wine", "makensis"]
-WINE_PYS = {'3.3':WINE_PY33, '3.2':WINE_PY32,
+WINE_PYS = {'3.4':WINE_PY34, '3.3':WINE_PY33, '3.2':WINE_PY32,
             '2.7':WINE_PY27, '2.6':WINE_PY26}
 
 # Framework Python locations on OS X
@@ -181,7 +182,9 @@ MPKG_PYTHON = {
         "2.6": "/Library/Frameworks/Python.framework/Versions/2.6/bin/python",
         "2.7": "/Library/Frameworks/Python.framework/Versions/2.7/bin/python",
         "3.2": "/Library/Frameworks/Python.framework/Versions/3.2/bin/python3",
-        "3.3": "/Library/Frameworks/Python.framework/Versions/3.3/bin/python3"}
+        "3.3": "/Library/Frameworks/Python.framework/Versions/3.3/bin/python3",
+        "3.4": "/Library/Frameworks/Python.framework/Versions/3.4/bin/python3"
+        }
 # Full path to the *static* gfortran runtime
 LIBGFORTRAN_A_PATH = "/usr/local/lib/libgfortran.a"
 
@@ -296,6 +299,10 @@ def tarball_name(type='gztar'):
     root = 'scipy-%s' % FULLVERSION
     if type == 'gztar':
         return root + '.tar.gz'
+    elif type == 'xztar':
+        return root + '.tar.xz'
+    elif type == 'tar':
+        return root + '.tar'
     elif type == 'zip':
         return root + '.zip'
     raise ValueError("Unknown type %s" % type)
@@ -305,10 +312,22 @@ def sdist():
     # To be sure to bypass paver when building sdist... paver + scipy.distutils
     # do not play well together.
     sh('python setup.py sdist --formats=gztar,zip')
+    sh('python setup.py sdist --formats=tar')
+    if os.path.exists(os.path.join('dist', tarball_name("xztar"))):
+        os.unlink(os.path.join('dist', tarball_name("xztar")))
+    sh('xz %s' % os.path.join('dist', tarball_name("tar")), ignore_error=True)
 
     # Copy the superpack into installers dir
     if not os.path.exists(options.installers.installersdir):
         os.makedirs(options.installers.installersdir)
+
+    if not os.path.exists(os.path.join('dist', tarball_name("xztar"))):
+        warnings.warn("Could not create tar.xz! Do you have xz installed?")
+    else:
+        t = 'xztar'
+        source = os.path.join('dist', tarball_name(t))
+        target = os.path.join(options.installers.installersdir, tarball_name(t))
+        shutil.copy(source, target)
 
     for t in ['gztar', 'zip']:
         source = os.path.join('dist', tarball_name(t))
@@ -385,7 +404,15 @@ def bdist_superpack(options):
             os.remove(target)
         if not os.path.exists(os.path.dirname(target)):
             os.makedirs(os.path.dirname(target))
-        os.rename(source, target)
+
+        try:
+            os.rename(source, target)
+        except OSError:
+            # May be due to dev version having 'Unknown' in name, if git isn't
+            # found.  This can be the case when compiling under Wine.
+            ix = source.find('.dev-') + 5
+            source = source[:ix] + 'Unknown' + source[ix+7:]
+            os.rename(source, target)
 
     bdist_wininst_arch(pyver, 'nosse')
     copy_bdist("nosse")
@@ -604,17 +631,28 @@ def _create_dmg(pyver, src_dir, volname=None):
 # Release notes and Changelog
 #----------------------------
 
-def compute_md5():
-    released = paver.path.path(options.installers.installersdir).listdir()
+def compute_md5(idirs):
+    released = paver.path.path(idirs).listdir()
     checksums = []
-    for f in released:
-        if not f.endswith('DS_Store'):
-            m = md5.md5(open(f, 'r').read())
-            checksums.append('%s  %s' % (m.hexdigest(), f))
+    for f in sorted(released):
+        m = md5(open(f, 'r').read())
+        checksums.append('%s  %s' % (m.hexdigest(), os.path.basename(f)))
 
     return checksums
 
-def write_release_task(filename='NOTES.txt'):
+def compute_sha256(idirs):
+    # better checksum so gpg signed README.txt containing the sums can be used
+    # to verify the binaries instead of signing all binaries
+    released = paver.path.path(idirs).listdir()
+    checksums = []
+    for f in sorted(released):
+        m = sha256(open(f, 'r').read())
+        checksums.append('%s  %s' % (m.hexdigest(), os.path.basename(f)))
+
+    return checksums
+
+def write_release_task(options, filename='NOTES.txt'):
+    idirs = options.installers.installersdir
     source = paver.path.path(RELEASE)
     target = paver.path.path(filename)
     if target.exists():
@@ -625,9 +663,17 @@ def write_release_task(filename='NOTES.txt'):
 Checksums
 =========
 
-""")
-    ftarget.writelines(['%s\n' % c for c in compute_md5()])
+MD5
+~~~
 
+""")
+    ftarget.writelines(['%s\n' % c for c in compute_md5(idirs)])
+    ftarget.writelines("""
+SHA256
+~~~~~~
+
+""")
+    ftarget.writelines(['%s\n' % c for c in compute_sha256(idirs)])
 
 def write_log_task(filename='Changelog'):
     st = subprocess.Popen(
@@ -640,14 +686,14 @@ def write_log_task(filename='Changelog'):
     a.close()
 
 @task
-def write_release():
-    write_release_task()
+def write_release(options):
+    write_release_task(options)
 
 @task
 def write_log():
     write_log_task()
 
 @task
-def write_release_and_log():
-    write_release_task(os.path.join(options.installers.releasedir, 'README'))
+def write_release_and_log(options):
+    write_release_task(options, os.path.join(options.installers.releasedir, 'README'))
     write_log_task(os.path.join(options.installers.releasedir, 'Changelog'))

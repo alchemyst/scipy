@@ -7,8 +7,8 @@ from os.path import join
 
 def configuration(parent_package='',top_path=None):
     from numpy.distutils.system_info import get_info, NotFoundError
-    from numpy.distutils.misc_util import Configuration
-    from scipy._build_utils import get_g77_abi_wrappers, split_fortran_files
+    from numpy.distutils.misc_util import Configuration, get_numpy_include_dirs
+    from scipy._build_utils import get_sgemv_fix, get_g77_abi_wrappers, split_fortran_files
 
     config = Configuration('linalg',parent_package,top_path)
 
@@ -25,6 +25,7 @@ def configuration(parent_package='',top_path=None):
     # fblas:
     sources = ['fblas.pyf.src']
     sources += get_g77_abi_wrappers(lapack_opt)
+    sources += get_sgemv_fix(lapack_opt)
 
     config.add_extension('_fblas',
                          sources=sources,
@@ -60,12 +61,6 @@ def configuration(parent_package='',top_path=None):
     # _flinalg:
     config.add_extension('_flinalg',
                          sources=[join('src','det.f'),join('src','lu.f')],
-                         extra_info=lapack_opt
-                         )
-
-    # calc_lwork:
-    config.add_extension('calc_lwork',
-                         [join('src','calc_lwork.f')],
                          extra_info=lapack_opt
                          )
 
@@ -122,9 +117,20 @@ def configuration(parent_package='',top_path=None):
                          extra_info=lapack_opt
                          )
 
+    # _calc_lwork:
+    config.add_extension('_calc_lwork',
+                         [join('src', 'calc_lwork.f')],
+                         extra_info=lapack_opt)
+
+    # _solve_toeplitz:
+    config.add_extension('_solve_toeplitz',
+                         sources=[('_solve_toeplitz.c')],
+                         include_dirs=[get_numpy_include_dirs()])
+
     config.add_data_dir('tests')
     config.add_data_dir('benchmarks')
     return config
+
 
 if __name__ == '__main__':
     from numpy.distutils.core import setup

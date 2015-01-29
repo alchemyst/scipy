@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division, print_function, absolute_import
 
-import os
-import sys
-import re
-from distutils.dep_util import newer_group, newer
-from glob import glob
 from os.path import join
 
 
@@ -43,6 +38,7 @@ def configuration(parent_package='',top_path=None):
                          extra_info=lapack_opt)
 
     config.add_data_dir('tests')
+    config.add_data_dir('benchmarks')
 
     return config
 

@@ -19,6 +19,9 @@ cimport setlist
 
 from numpy.compat import asbytes
 
+cdef extern from "numpy/npy_math.h":
+    double nan "NPY_NAN"
+
 __all__ = ['Delaunay', 'ConvexHull', 'Voronoi', 'tsearch']
 
 #------------------------------------------------------------------------------
@@ -575,11 +578,13 @@ cdef class _Qhull:
         if self._is_delaunay:
             facet_ndim += 1
 
-        id_map = np.empty((qh_qh.facet_id,), dtype=np.intc)
-        id_map.fill(-1)
+        id_map = np.empty(qh_qh.facet_id, dtype=np.intc)
 
         # Compute facet indices
         with nogil:
+            for i in range(qh_qh.facet_id):
+                id_map[i] = -1
+
             facet = qh_qh.facet_list
             j = 0
             while facet and facet.next:
@@ -750,8 +755,9 @@ cdef class _Qhull:
         # -- Grab Voronoi regions
         regions = []
 
-        point_region = np.empty((self.numpoints,), np.intp)
-        point_region.fill(-1)
+        point_region = np.empty(self.numpoints, np.intp)
+        for i in range(self.numpoints):
+            point_region[i] = -1
 
         vertex = qh_qh.vertex_list
         while vertex and vertex.next:
@@ -848,8 +854,11 @@ cdef class _Qhull:
         See qhull/io.c:qh_printextremes_2d
 
         """
-        cdef facetT *facet, *startfacet, *nextfacet
-        cdef vertexT *vertexA, *vertexB
+        cdef facetT *facet
+        cdef facetT *startfacet
+        cdef facetT *nextfacet
+        cdef vertexT *vertexA
+        cdef vertexT *vertexB
         cdef int[:] extremes
         cdef int nextremes
 
@@ -990,10 +999,11 @@ def _get_barycentric_transforms(np.ndarray[np.double_t, ndim=2] points,
     cdef int i, j, n, nrhs, lda, ldb, info
     cdef int ipiv[NPY_MAXDIMS+1]
     cdef int ndim, nsimplex
-    cdef double centroid[NPY_MAXDIMS], c[NPY_MAXDIMS+1]
+    cdef double centroid[NPY_MAXDIMS]
+    cdef double c[NPY_MAXDIMS+1]
     cdef double *transform
     cdef double anorm, rcond
-    cdef double nan, rcond_limit
+    cdef double rcond_limit
 
     cdef double work[4*NPY_MAXDIMS]
     cdef int iwork[NPY_MAXDIMS]
@@ -1002,7 +1012,6 @@ def _get_barycentric_transforms(np.ndarray[np.double_t, ndim=2] points,
     cdef double y1, y2, y3
     cdef double det
 
-    nan = np.nan
     ndim = points.shape[1]
     nsimplex = simplices.shape[0]
 
@@ -1582,10 +1591,11 @@ class Delaunay(_QhullUser):
         For simplices at the boundary, -1 denotes no neighbor.
     equations : ndarray of double, shape (nsimplex, ndim+2)
         [normal, offset] forming the hyperplane equation of the facet
-        on the paraboloid (see [Qhull]_ documentation for more).
+        on the paraboloid
+        (see `Qhull documentation <http://www.qhull.org/>`__ for more).
     paraboloid_scale, paraboloid_shift : float
         Scale and shift for the extra paraboloid dimension
-        (see [Qhull]_ documentation for more).
+        (see `Qhull documentation <http://www.qhull.org/>`__ for more).
     transform : ndarray of double, shape (nsimplex, ndim+1, ndim)
         Affine transform from ``x`` to the barycentric coordinates ``c``.
         This is defined by::
@@ -1640,7 +1650,8 @@ class Delaunay(_QhullUser):
 
     Notes
     -----
-    The tesselation is computed using the Qhull library [Qhull]_.
+    The tesselation is computed using the Qhull library 
+    `Qhull library <http://www.qhull.org/>`__.
 
     .. note::
 
@@ -1706,15 +1717,11 @@ class Delaunay(_QhullUser):
     The coordinates for the first point are all positive, meaning it
     is indeed inside the triangle.
 
-    References
-    ----------
-    .. [Qhull] http://www.qhull.org/
-
     """
 
     def __init__(self, points, furthest_site=False, incremental=False,
                  qhull_options=None):
-        if np.ma.is_masked(points):
+        if np.ma.isMaskedArray(points):
             raise ValueError('Input points cannot be a masked array')
         points = np.ascontiguousarray(points, dtype=np.double)
 
@@ -1976,7 +1983,7 @@ class Delaunay(_QhullUser):
             eps = 100 * np.finfo(np.double).eps
         else:
             eps = tol
-        eps_broad = np.sqrt(eps)
+        eps_broad = sqrt(eps)
         out = np.zeros((xi.shape[0],), dtype=np.intc)
         out_ = out
         _get_delaunay_info(&info, self, 1, 0, 0)
@@ -2157,7 +2164,7 @@ class ConvexHull(_QhullUser):
         -1 denotes no neighbor.
     equations : ndarray of double, shape (nfacet, ndim+1)
         [normal, offset] forming the hyperplane equation of the facet
-        (see [Qhull]_ documentation for more).
+        (see `Qhull documentation <http://www.qhull.org/>`__  for more).
     coplanar : ndarray of int, shape (ncoplanar, 3)
         Indices of coplanar points and the corresponding indices of
         the nearest facets and nearest vertex indices.  Coplanar
@@ -2176,7 +2183,8 @@ class ConvexHull(_QhullUser):
 
     Notes
     -----
-    The convex hull is computed using the Qhull libary [Qhull]_.
+    The convex hull is computed using the 
+    `Qhull library <http://www.qhull.org/>`__.
 
     Do not call the ``add_points`` method from a ``__del__``
     destructor.
@@ -2211,7 +2219,7 @@ class ConvexHull(_QhullUser):
     """
 
     def __init__(self, points, incremental=False, qhull_options=None):
-        if np.ma.is_masked(points):
+        if np.ma.isMaskedArray(points):
             raise ValueError('Input points cannot be a masked array')
         points = np.ascontiguousarray(points, dtype=np.double)
 
@@ -2281,11 +2289,11 @@ class Voronoi(_QhullUser):
         Coordinates of input points.
     vertices : ndarray of double, shape (nvertices, ndim)
         Coordinates of the Voronoi vertices.
-    ridge_points : ndarray of ints, shape (nridges, 2)
+    ridge_points : ndarray of ints, shape ``(nridges, 2)``
         Indices of the points between which each Voronoi ridge lies.
-    ridge_vertices : list of list of ints, shape (nridges, *)
+    ridge_vertices : list of list of ints, shape ``(nridges, *)``
         Indices of the Voronoi vertices forming each Voronoi ridge.
-    regions : list of list of ints, shape (nregions, *)
+    regions : list of list of ints, shape ``(nregions, *)``
         Indices of the Voronoi vertices forming each Voronoi region.
         -1 indicates vertex outside the Voronoi diagram.
     point_region : list of ints, shape (npoints)
@@ -2303,7 +2311,8 @@ class Voronoi(_QhullUser):
 
     Notes
     -----
-    The Voronoi diagram is computed using the Qhull libary [Qhull]_.
+    The Voronoi diagram is computed using the 
+    `Qhull library <http://www.qhull.org/>`__.
 
     Do not call the ``add_points`` method from a ``__del__``
     destructor.
@@ -2356,14 +2365,10 @@ class Voronoi(_QhullUser):
            [4, 1],
            [4, 7]], dtype=int32)
 
-    References
-    ----------
-    .. [Qhull] http://www.qhull.org/
-
     """
     def __init__(self, points, furthest_site=False, incremental=False,
                  qhull_options=None):
-        if np.ma.is_masked(points):
+        if np.ma.isMaskedArray(points):
             raise ValueError('Input points cannot be a masked array')
         points = np.ascontiguousarray(points, dtype=np.double)
 

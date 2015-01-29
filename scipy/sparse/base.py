@@ -5,11 +5,10 @@ __all__ = ['spmatrix', 'isspmatrix', 'issparse',
         'SparseWarning','SparseEfficiencyWarning']
 
 import sys
-from warnings import warn
 
 import numpy as np
 
-from scipy.lib.six import xrange
+from scipy._lib.six import xrange
 from .sputils import isdense, isscalarlike, isintlike
 
 
@@ -47,6 +46,13 @@ _formats = {'csc':[0, "Compressed Sparse Column"],
             'vbr':[18, "Variable Block Row"],
             'und':[19, "Undefined"]
             }
+
+
+# These univariate ufuncs preserve zeros.
+_ufuncs_with_fixed_point_at_zero = frozenset([
+        np.sin, np.tan, np.arcsin, np.arctan, np.sinh, np.tanh, np.arcsinh,
+        np.arctanh, np.rint, np.sign, np.expm1, np.log1p, np.deg2rad,
+        np.rad2deg, np.floor, np.ceil, np.trunc, np.sqrt])
 
 
 MAXPRINT = 50
@@ -223,6 +229,12 @@ class spmatrix(object):
         """Point-wise multiplication by another matrix
         """
         return self.tocsr().multiply(other)
+
+    def maximum(self, other):
+        return self.tocsr().maximum(other)
+
+    def minimum(self, other):
+        return self.tocsr().minimum(other)
 
     def dot(self, other):
         """Ordinary dot product
@@ -437,19 +449,19 @@ class spmatrix(object):
         return -self.tocsr()
 
     def __iadd__(self, other):
-        raise NotImplementedError
+        return NotImplemented
 
     def __isub__(self, other):
-        raise NotImplementedError
+        return NotImplemented
 
     def __imul__(self, other):
-        raise NotImplementedError
+        return NotImplemented
 
     def __idiv__(self, other):
         return self.__itruediv__(other)
 
     def __itruediv__(self, other):
-        raise NotImplementedError
+        return NotImplemented
 
     def __pow__(self, other):
         if self.shape[0] != self.shape[1]:
@@ -668,16 +680,18 @@ class spmatrix(object):
         else:
             res_dtype = self.dtype
 
-        # Calculate the sum.
+        if axis is None:
+            # sum over rows and columns
+            return (self * np.asmatrix(np.ones((n, 1), dtype=res_dtype))).sum()
+
+        if axis < 0:
+            axis += 2
         if axis == 0:
             # sum over columns
             return np.asmatrix(np.ones((1, m), dtype=res_dtype)) * self
         elif axis == 1:
             # sum over rows
             return self * np.asmatrix(np.ones((n, 1), dtype=res_dtype))
-        elif axis is None:
-            # sum over rows and columns
-            return (self * np.asmatrix(np.ones((n, 1), dtype=res_dtype))).sum()
         else:
             raise ValueError("axis out of bounds")
 
@@ -685,19 +699,21 @@ class spmatrix(object):
         """Average the matrix over the given axis.  If the axis is None,
         average over both rows and columns, returning a scalar.
         """
-        # Mimic numpy's casting.  The int32/int64 check works around numpy
-        # 1.5.x behavior of np.issubdtype, see gh-2677.
+        # Mimic numpy's casting.
         if (np.issubdtype(self.dtype, np.float_) or
-            np.issubdtype(self.dtype, np.int_) or
-            self.dtype in [np.dtype('int32'), np.dtype('int64')] or
-            np.issubdtype(self.dtype, np.bool_)):
-                res_dtype = np.float_
+                np.issubdtype(self.dtype, np.integer) or
+                np.issubdtype(self.dtype, np.bool_)):
+            res_dtype = np.float_
         elif np.issubdtype(self.dtype, np.complex_):
             res_dtype = np.complex_
         else:
             res_dtype = self.dtype
 
-        # Calculate the mean.
+        if axis is None:
+            return self.sum(None) * 1.0 / (self.shape[0]*self.shape[1])
+
+        if axis < 0:
+            axis += 2
         if axis == 0:
             mean = self.astype(res_dtype).sum(0)
             mean *= 1.0 / self.shape[0]
@@ -706,8 +722,6 @@ class spmatrix(object):
             mean = self.astype(res_dtype).sum(1)
             mean *= 1.0 / self.shape[1]
             return mean
-        elif axis is None:
-            return self.sum(None) * 1.0 / (self.shape[0]*self.shape[1])
         else:
             raise ValueError("axis out of bounds")
 
@@ -718,25 +732,56 @@ class spmatrix(object):
         return self.tocsr().diagonal()
 
     def setdiag(self, values, k=0):
-        """Fills the diagonal elements {a_ii} with the values from the
-        given sequence.  If k != 0, fills the off-diagonal elements
-        {a_{i,i+k}} instead.
+        """
+        Set diagonal or off-diagonal elements of the array.
 
-        values may have any length.  If the diagonal is longer than values,
-        then the remaining diagonal entries will not be set.  If values if
-        longer than the diagonal, then the remaining values are ignored.
+        Parameters
+        ----------
+        values : array_like
+            New values of the diagonal elements.
+
+            Values may have any length.  If the diagonal is longer than values,
+            then the remaining diagonal entries will not be set.  If values if
+            longer than the diagonal, then the remaining values are ignored.
+
+            If a scalar value is given, all of the diagonal is set to it.
+
+        k : int, optional
+            Which off-diagonal to set, corresponding to elements a[i,i+k].
+            Default: 0 (the main diagonal).
+
         """
         M, N = self.shape
         if (k > 0 and k >= N) or (k < 0 and -k >= M):
             raise ValueError("k exceeds matrix dimensions")
+        self._setdiag(np.asarray(values), k)
+
+    def _setdiag(self, values, k):
+        M, N = self.shape
         if k < 0:
-            max_index = min(M+k, N, len(values))
-            for i,v in enumerate(values[:max_index]):
-                self[i - k, i] = v
+            if values.ndim == 0:
+                # broadcast
+                max_index = min(M+k, N)
+                for i in xrange(max_index):
+                    self[i - k, i] = values
+            else:
+                max_index = min(M+k, N, len(values))
+                if max_index <= 0:
+                    return
+                for i,v in enumerate(values[:max_index]):
+                    self[i - k, i] = v
         else:
-            max_index = min(M, N-k, len(values))
-            for i,v in enumerate(values[:max_index]):
-                self[i, i + k] = v
+            if values.ndim == 0:
+                # broadcast
+                max_index = min(M, N-k)
+                for i in xrange(max_index):
+                    self[i, i + k] = values
+            else:
+                max_index = min(M, N-k, len(values))
+                if max_index <= 0:
+                    return
+                for i,v in enumerate(values[:max_index]):
+                    self[i, i + k] = v
 
     def _process_toarray_args(self, order, out):
         if out is not None:
@@ -755,6 +800,13 @@ class spmatrix(object):
         """Method for compatibility with NumPy's ufuncs and dot
         functions.
         """
+
+        if any(not isinstance(x, spmatrix) and np.asarray(x).dtype == object
+               for x in inputs):
+            # preserve previous behavior with object arrays
+            with_self = list(inputs)
+            with_self[pos] = np.asarray(self, dtype=object)
+            return getattr(func, method)(*with_self, **kwargs)
 
         out = kwargs.pop('out', None)
         if method != '__call__' or kwargs:
@@ -787,9 +839,13 @@ class spmatrix(object):
         elif func is np.true_divide:
             rdivide = (pos == 1)
             result = self._divide(*without_self, true_divide=True, rdivide=rdivide)
-        elif func in (np.sin, np.tan, np.arcsin, np.arctan, np.sinh, np.tanh,
-                      np.arcsinh, np.arctanh, np.rint, np.sign, np.expm1, np.log1p,
-                      np.deg2rad, np.rad2deg, np.floor, np.ceil, np.trunc, np.sqrt):
+        elif func is np.maximum:
+            result = self.maximum(*without_self)
+        elif func is np.minimum:
+            result = self.minimum(*without_self)
+        elif func is np.absolute:
+            result = abs(self)
+        elif func in _ufuncs_with_fixed_point_at_zero:
             func_name = func.__name__
             if hasattr(self, func_name):
                 result = getattr(self, func_name)()

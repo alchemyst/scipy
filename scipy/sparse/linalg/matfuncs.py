@@ -14,13 +14,10 @@ __all__ = ['expm', 'inv']
 
 import math
 
-from numpy import asarray, dot, eye, ceil, log2
-from numpy import matrix as mat
 import numpy as np
 
 import scipy.misc
-from scipy.linalg.misc import norm
-from scipy.linalg.basic import solve, solve_triangular, inv
+from scipy.linalg.basic import solve, solve_triangular
 
 from scipy.sparse.base import isspmatrix
 from scipy.sparse.construct import eye as speye
@@ -38,8 +35,6 @@ def inv(A):
     """
     Compute the inverse of a sparse matrix
 
-    .. versionadded:: 0.12.0
-
     Parameters
     ----------
     A : (M,M) ndarray or sparse matrix
@@ -55,6 +50,8 @@ def inv(A):
     This computes the sparse inverse of `A`.  If the inverse of `A` is expected
     to be non-sparse, it will likely be faster to convert `A` to dense and use
     scipy.linalg.inv.
+
+    .. versionadded:: 0.12.0
 
     """
     I = speye(A.shape[0], A.shape[1], dtype=A.dtype, format=A.format)
@@ -121,7 +118,7 @@ def _count_nonzero(A):
     if isspmatrix(A):
         return np.sum(A.toarray() != 0)
     else:
-        return np.sum(A != 0)
+        return np.count_nonzero(A)
 
 
 def _is_upper_triangular(A):
@@ -364,7 +361,7 @@ class _ExpmPadeHelper(object):
         use_exact_onenorm : bool, optional
             If True then only the exact one-norm of matrix powers and products
             will be used. Otherwise, the one-norm of powers and products
-            may intially be estimated.
+            may initially be estimated.
         """
         self.A = A
         self._A2 = None
@@ -553,11 +550,9 @@ def expm(A):
     """
     Compute the matrix exponential using Pade approximation.
 
-    .. versionadded:: 0.12.0
-
     Parameters
     ----------
-    A : (M,M) array or sparse matrix
+    A : (M,M) array_like or sparse matrix
         2D Array or Matrix (sparse or dense) to be exponentiated
 
     Returns
@@ -569,6 +564,8 @@ def expm(A):
     -----
     This is algorithm (6.1) which is a simplification of algorithm (5.1).
 
+    .. versionadded:: 0.12.0
+
     References
     ----------
     .. [1] Awad H. Al-Mohy and Nicholas J. Higham (2009)
@@ -577,6 +574,12 @@ def expm(A):
            31 (3). pp. 970-989. ISSN 1095-7162
 
     """
+    # Avoid indiscriminate asarray() to allow sparse or other strange arrays.
+    if isinstance(A, (list, tuple)):
+        A = np.asarray(A)
+    if len(A.shape) != 2 or A.shape[0] != A.shape[1]:
+        raise ValueError('expected a square matrix')
+
     # Detect upper triangularity.
     structure = UPPER_TRIANGULAR if _is_upper_triangular(A) else None
 
@@ -786,7 +789,8 @@ def _ell(A, m):
 
     # The c_i are explained in (2.2) and (2.6) of the 2005 expm paper.
     # They are coefficients of terms of a generating function series expansion.
-    abs_c_recip = scipy.misc.comb(2*p, p, exact=True) * math.factorial(2*p + 1)
+    choose_2p_p = scipy.misc.comb(2*p, p, exact=True)
+    abs_c_recip = float(choose_2p_p * math.factorial(2*p + 1))
 
     # This is explained after Eq. (1.2) of the 2009 expm paper.
     # It is the "unit roundoff" of IEEE double precision arithmetic.
