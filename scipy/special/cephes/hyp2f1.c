@@ -67,36 +67,17 @@
  * Copyright 1984, 1987, 1992, 2000 by Stephen L. Moshier
  */
 
-#include <stdlib.h>
 #include "mconf.h"
+#include <stdlib.h>
 
-#ifdef DEC
-#define EPS 1.0e-14
-#define EPS2 1.0e-11
-#endif
-
-#ifdef IBMPC
 #define EPS 1.0e-13
 #define EPS2 1.0e-10
-#endif
-
-#ifdef MIEEE
-#define EPS 1.0e-13
-#define EPS2 1.0e-10
-#endif
-
-#ifdef UNK
-#define EPS 1.0e-13
-#define EPS2 1.0e-10
-#endif
 
 #define ETHRESH 1.0e-12
 
 #define MAX_ITERATIONS 10000
 
 extern double MACHEP;
-
-extern int sgngam;
 
 static double hyt2f1(double a, double b, double c, double x, double *loss);
 static double hys2f1(double a, double b, double c, double x, double *loss);
@@ -333,6 +314,8 @@ double *loss;
 
     if (x > 0.9 && !(neg_int_a || neg_int_b)) {
 	if (fabs(d - id) > EPS) {
+	    int sgngam;
+
 	    /* test for integer c-a-b */
 	    /* Try the power series first */
 	    y = hys2f1(a, b, c, x, &err);
@@ -341,20 +324,20 @@ double *loss;
 	    /* If power series fails, then apply AMS55 #15.3.6 */
 	    q = hys2f1(a, b, 1.0 - d, s, &err);
             sign = 1;
-            w = lgam(d);
+            w = lgam_sgn(d, &sgngam);
             sign *= sgngam;
-            w -= lgam(c-a);
+            w -= lgam_sgn(c-a, &sgngam);
             sign *= sgngam;
-            w -= lgam(c-b);
+            w -= lgam_sgn(c-b, &sgngam);
             sign *= sgngam;
 	    q *= sign * exp(w);
 	    r = pow(s, d) * hys2f1(c - a, c - b, d + 1.0, s, &err1);
             sign = 1;
-            w = lgam(-d);
+            w = lgam_sgn(-d, &sgngam);
             sign *= sgngam;
-            w -= lgam(a);
-            sign *= sgngam;   
-            w -= lgam(b);
+            w -= lgam_sgn(a, &sgngam);
+            sign *= sgngam;
+            w -= lgam_sgn(b, &sgngam);
             sign *= sgngam;
 	    r *= sign * exp(w);
 	    y = q + r;
@@ -548,8 +531,8 @@ static double hyp2f1ra(double a, double b, double c, double x,
 		       double *loss)
 {
     double f2, f1, f0;
-    int n, da;
-    double t, err;
+    int n;
+    double t, err, da;
 
     /* Don't cross c or zero */
     if ((c < 0 && a <= c) || (c >= 0 && a >= c)) {

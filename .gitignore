@@ -67,6 +67,7 @@ dist
 MANIFEST
 # distutils configuration
 site.cfg
+setup.cfg
 # other temporary files
 .coverage
 .deps
@@ -97,6 +98,7 @@ site.cfg
 ehthumbs.db
 Icon?
 Thumbs.db
+*.dSYM
 
 # Documentation generated files #
 #################################
@@ -105,6 +107,11 @@ doc/source/generated
 
 # Things specific to this project #
 ###################################
+benchmarks/env
+benchmarks/results
+benchmarks/scipy
+benchmarks/html
+benchmarks/scipy-benchmarks
 scipy/__config__.py
 scipy/cluster/_vq.c
 scipy/cluster/_hierarchy.c
@@ -116,6 +123,7 @@ scipy/integrate/_dopmodule.c
 scipy/integrate/lsodamodule.c
 scipy/integrate/vodemodule.c
 scipy/interpolate/_ppoly.c
+scipy/interpolate/_bspl.c
 scipy/interpolate/interpnd.c
 scipy/interpolate/src/dfitpack-f2pywrappers.f
 scipy/interpolate/src/dfitpackmodule.c
@@ -140,19 +148,26 @@ scipy/linalg/_flapack-f2pywrappers.f
 scipy/linalg/_flapackmodule.c
 scipy/linalg/_interpolativemodule.c
 scipy/linalg/_solve_toeplitz.c
+scipy/linalg/_decomp_update.c
+scipy/linalg/_decomp_update.pyx
 scipy/linalg/cblas.pyf
 scipy/linalg/clapack.pyf
+scipy/linalg/cython_blas.c
+scipy/linalg/cython_lapack.c
 scipy/linalg/fblas.pyf
 scipy/linalg/flapack.pyf
 scipy/linalg/src/id_dist/src/*_subr_*.f
 scipy/ndimage/src/_ni_label.c
+scipy/ndimage/src/_cytest.c
 scipy/optimize/cobyla/_cobylamodule.c
 scipy/optimize/lbfgsb/_lbfgsbmodule.c
 scipy/optimize/minpack2/minpack2module.c
 scipy/optimize/nnls/_nnlsmodule.c
 scipy/optimize/slsqp/_slsqpmodule.c
+scipy/optimize/_lsq/givens_elimination.c
 scipy/signal/_spectral.c
-scipy/signal/_max_len_seq.c
+scipy/signal/_max_len_seq_inner.c
+scipy/signal/_upfirdn_apply.c
 scipy/signal/correlate_nd.c
 scipy/signal/lfilter.c
 scipy/sparse/_csparsetools.c
@@ -182,8 +197,11 @@ scipy/sparse/sparsetools/csc_impl.h
 scipy/sparse/sparsetools/csr_impl.h
 scipy/sparse/sparsetools/other_impl.h
 scipy/sparse/sparsetools/sparsetools_impl.h
-scipy/spatial/ckdtree.c
+scipy/spatial/ckdtree.cxx
+scipy/spatial/ckdtree.h
 scipy/spatial/qhull.c
+scipy/special/_comb.c
+scipy/spatial/qhull_misc_config.h
 scipy/special/_ellip_harm_2.c
 scipy/special/_ellip_harm_2.h
 scipy/special/_logit.c
@@ -192,9 +210,16 @@ scipy/special/_ufuncs.h
 scipy/special/_ufuncs_cxx.cxx
 scipy/special/_ufuncs_cxx.h
 scipy/special/specfunmodule.c
+scipy/special/cython_special.c
+scipy/special/cython_special.h
+scipy/special/_test_round.c
 scipy/stats/_rank.c
 scipy/stats/mvn-f2pywrappers.f
 scipy/stats/mvnmodule.c
 scipy/stats/statlibmodule.c
 scipy/stats/vonmises_cython.c
+scipy/stats/_stats.c
 scipy/version.py
+scipy/special/_exprel.c
+scipy/optimize/_group_columns.c
+

@@ -2,6 +2,7 @@
 
 from __future__ import division, print_function, absolute_import
 
+import numpy as np
 from numpy import arange, add, array, eye, copy, sqrt
 from numpy.testing import (TestCase, run_module_suite, assert_raises,
     assert_equal, assert_array_equal, assert_array_almost_equal,
@@ -9,11 +10,11 @@ from numpy.testing import (TestCase, run_module_suite, assert_raises,
 
 from scipy._lib.six import xrange
 
+from scipy import fftpack
 from scipy.special import comb
 from scipy.linalg import (toeplitz, hankel, circulant, hadamard, leslie,
                           companion, tri, triu, tril, kron, block_diag,
-                          hilbert, invhilbert, pascal, invpascal, dft)
-from scipy.fftpack import fft
+                          helmert, hilbert, invhilbert, pascal, invpascal, dft)
 from numpy.linalg import cond
 
 
@@ -243,6 +244,11 @@ class TestBlockDiag:
         x = block_diag([[True]])
         assert_equal(x.dtype, bool)
 
+    def test_mixed_dtypes(self):
+        actual = block_diag([[1]], [[1j]])
+        desired = np.array([[1, 0], [0, 1j]])
+        assert_array_equal(actual, desired)
+
     def test_scalar_and_1d_args(self):
         a = block_diag(1)
         assert_equal(a.shape, (1,1))
@@ -258,6 +264,17 @@ class TestBlockDiag:
         a = block_diag()
         assert_equal(a.ndim, 2)
         assert_equal(a.nbytes, 0)
+    
+    def test_empty_matrix_arg(self):
+        # regression test for gh-4596: check the shape of the result for empty matrix inputs
+        a = block_diag([[1, 0], [0, 1]],
+                       [],
+                       [[2, 3], [4, 5], [6, 7]])
+        assert_array_equal(a, [[1, 0, 0, 0],
+                               [0, 1, 0, 0],
+                               [0, 0, 2, 3],
+                               [0, 0, 4, 5],
+                               [0, 0, 6, 7]])
 
 
 class TestKron:
@@ -276,6 +293,25 @@ class TestKron:
                           [30, 40],
                           [33, 44]])
         assert_array_equal(a, expected)
+
+
+class TestHelmert(TestCase):
+
+    def test_orthogonality(self):
+        for n in range(1, 7):
+            H = helmert(n, full=True)
+            I = np.eye(n)
+            assert_allclose(H.dot(H.T), I, atol=1e-12)
+            assert_allclose(H.T.dot(H), I, atol=1e-12)
+
+    def test_subspace(self):
+        for n in range(2, 7):
+            H_full = helmert(n, full=True)
+            H_partial = helmert(n)
+            for U in H_full[1:, :].T, H_partial.T:
+                C = np.eye(n) - np.ones((n, n)) / n
+                assert_allclose(U.dot(U.T), C)
+                assert_allclose(U.T.dot(U), np.eye(n-1), atol=1e-12)
 
 
 class TestHilbert(TestCase):
@@ -540,7 +576,7 @@ def test_dft():
     x = array([0, 1, 2, 3, 4, 5, 0, 1])
     m = dft(8)
     mx = m.dot(x)
-    fx = fft(x)
+    fx = fftpack.fft(x)
     yield (assert_array_almost_equal, mx, fx)
 
 

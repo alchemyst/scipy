@@ -64,21 +64,21 @@ def linprog_verbose_callback(xk, **kwargs):
 
     saved_printoptions = np.get_printoptions()
     np.set_printoptions(linewidth=500,
-                        formatter={'float':lambda x: "{: 12.4f}".format(x)})
+                        formatter={'float':lambda x: "{0: 12.4f}".format(x)})
     if complete:
-        print("--------- Iteration Complete - Phase {:d} -------\n".format(phase))
+        print("--------- Iteration Complete - Phase {0:d} -------\n".format(phase))
         print("Tableau:")
     elif nit == 0:
-        print("--------- Initial Tableau - Phase {:d} ----------\n".format(phase))
+        print("--------- Initial Tableau - Phase {0:d} ----------\n".format(phase))
 
     else:
-        print("--------- Iteration {:d}  - Phase {:d} --------\n".format(nit, phase))
+        print("--------- Iteration {0:d}  - Phase {1:d} --------\n".format(nit, phase))
         print("Tableau:")
 
     if nit >= 0:
         print("" + str(tableau) + "\n")
         if not complete:
-            print("Pivot Element: T[{:.0f}, {:.0f}]\n".format(pivrow, pivcol))
+            print("Pivot Element: T[{0:.0f}, {1:.0f}]\n".format(pivrow, pivcol))
         print("Basic Variables:", basis)
         print()
         print("Current Solution:")
@@ -130,7 +130,7 @@ def linprog_terse_callback(xk, **kwargs):
 
     if nit == 0:
         print("Iter:   X:")
-    print("{: <5d}   ".format(nit), end="")
+    print("{0: <5d}   ".format(nit), end="")
     print(xk)
 
 
@@ -266,7 +266,7 @@ def _solve_simplex(T, n, basis, maxiter=1000, phase=2, callback=None,
         The phase of the optimization being executed.  In phase 1 a basic
         feasible solution is sought and the T has an additional row representing
         an alternate objective function.
-    callback : callable
+    callback : callable, optional
         If a callback function is provided, it will be called within each
         iteration of the simplex algorithm. The callback must have the
         signature `callback(xk, **kwargs)` where xk is the current solution
@@ -305,7 +305,6 @@ def _solve_simplex(T, n, basis, maxiter=1000, phase=2, callback=None,
     """
     nit = nit0
     complete = False
-    solution = np.zeros(T.shape[1]-1, dtype=np.float64)
 
     if phase == 1:
         m = T.shape[0]-2
@@ -313,6 +312,37 @@ def _solve_simplex(T, n, basis, maxiter=1000, phase=2, callback=None,
         m = T.shape[0]-1
     else:
         raise ValueError("Argument 'phase' to _solve_simplex must be 1 or 2")
+
+    if phase == 2:
+        # Check if any artificial variables are still in the basis.
+        # If yes, check if any coefficients from this row and a column
+        # corresponding to one of the non-artificial variable is non-zero.
+        # If found, pivot at this term. If not, start phase 2.
+        # Do this for all artificial variables in the basis.
+        # Ref: "An Introduction to Linear Programming and Game Theory"
+        # by Paul R. Thie, Gerard E. Keough, 3rd Ed,
+        # Chapter 3.7 Redundant Systems (pag 102)
+        for pivrow in [row for row in range(basis.size)
+                       if basis[row] > T.shape[1] - 2]:
+            non_zero_row = [col for col in range(T.shape[1] - 1)
+                            if T[pivrow, col] != 0]
+            if len(non_zero_row) > 0:
+                pivcol = non_zero_row[0]
+                # variable represented by pivcol enters
+                # variable in basis[pivrow] leaves
+                basis[pivrow] = pivcol
+                pivval = T[pivrow][pivcol]
+                T[pivrow, :] = T[pivrow, :] / pivval
+                for irow in range(T.shape[0]):
+                    if irow != pivrow:
+                        T[irow, :] = T[irow, :] - T[pivrow, :]*T[irow, pivcol]
+                nit += 1
+
+    if len(basis[:m]) == 0:
+        solution = np.zeros(T.shape[1] - 1, dtype=np.float64)
+    else:
+        solution = np.zeros(max(T.shape[1] - 1, max(basis[:m]) + 1),
+                            dtype=np.float64)
 
     while not complete:
         # Find the pivot column
@@ -365,7 +395,7 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     Solve the following linear programming problem via a two-phase
     simplex algorithm.
 
-    maximize:     c^T * x
+    minimize:     c^T * x
 
     subject to:   A_ub * x <= b_ub
                   A_eq * x == b_eq
@@ -373,8 +403,8 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     Parameters
     ----------
     c : array_like
-        Coefficients of the linear objective function to be maximized.
-    A_ub :
+        Coefficients of the linear objective function to be minimized.
+    A_ub : array_like
         2-D array which, when matrix-multiplied by x, gives the values of the
         upper-bound inequality constraints at x.
     b_ub : array_like
@@ -397,10 +427,6 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
                   each variable x_i will be bounded by lb[i] and ub[i].
         Infinite bounds are specified using -np.inf (negative)
         or np.inf (positive).
-    maxiter : int
-       The maximum number of iterations to perform.
-    disp : bool
-        If True, print exit status message to sys.stdout
     callback : callable
         If a callback function is provide, it will be called within each
         iteration of the simplex algorithm. The callback must have the
@@ -412,6 +438,13 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         "phase" : Whether the algorithm is in Phase 1 or Phase 2.
         "bv" : A structured array containing a string representation of each
                basic variable and its current value.
+
+    Options
+    -------
+    maxiter : int
+       The maximum number of iterations to perform.
+    disp : bool
+        If True, print exit status message to sys.stdout
     tol : float
         The tolerance which determines when a solution is "close enough" to zero
         in Phase 1 to be considered a basic feasible solution or close enough
@@ -428,6 +461,8 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         x : ndarray
             The independent variable vector which optimizes the linear
             programming problem.
+        fun : float
+            Value of the objective function.
         slack : ndarray
             The values of the slack variables.  Each slack variable corresponds
             to an inequality constraint.  If the slack is zero, then the
@@ -477,16 +512,13 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     >>> x1_bnds = (-3, None)
     >>> res = linprog(c, A, b, bounds=(x0_bnds, x1_bnds))
     >>> print(res)
-    Optimization terminated successfully.
-         Current function value: -22.000000
-         Iterations: 1
-    status: 0
-    x: array([ 10.,  -3.])
-    slack: array([ 39.,   0.])
-    nit: 1
-    message: 'Optimization terminated successfully.'
-    fun: -22.0
-    success: True
+         fun: -22.0
+     message: 'Optimization terminated successfully.'
+         nit: 1
+       slack: array([ 39.,   0.])
+      status: 0
+     success: True
+           x: array([ 10.,  -3.])
 
     References
     ----------
@@ -502,7 +534,7 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     status = 0
     messages = {0: "Optimization terminated successfully.",
                 1: "Iteration limit reached.",
-                2: "Optimzation failed. Unable to find a feasible"
+                2: "Optimization failed. Unable to find a feasible"
                    " starting point.",
                 3: "Optimization failed. The problem appears to be unbounded.",
                 4: "Optimization failed. Singular matrix encountered."}
@@ -522,7 +554,7 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     beq = np.ravel(np.asarray(b_eq)) if b_eq is not None else np.empty([0])
     bub = np.ravel(np.asarray(b_ub)) if b_ub is not None else np.empty([0])
 
-    # Analyze the bounds and determine what modifications to me made to
+    # Analyze the bounds and determine what modifications to be made to
     # the constraints in order to accommodate them.
     L = np.zeros(n, dtype=np.float64)
     U = np.ones(n, dtype=np.float64)*np.inf
@@ -530,8 +562,10 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         pass
     elif len(bounds) == 2 and not hasattr(bounds[0], '__len__'):
         # All bounds are the same
-        L = np.asarray(n*[bounds[0]], dtype=np.float64)
-        U = np.asarray(n*[bounds[1]], dtype=np.float64)
+        a = bounds[0] if bounds[0] is not None else -np.inf
+        b = bounds[1] if bounds[1] is not None else np.inf
+        L = np.asarray(n*[a], dtype=np.float64)
+        U = np.asarray(n*[b], dtype=np.float64)
     else:
         if len(bounds) != n:
             status = -1
@@ -604,8 +638,8 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
                 # For each row in the constraint matrices, we take the
                 # coefficient from column i in A,
                 # and subtract the product of that and L[i] to the RHS b
-                beq[:] = beq[:] - Aeq[:, i] * L[i]
-                bub[:] = bub[:] - Aub[:, i] * L[i]
+                beq = beq - Aeq[:, i] * L[i]
+                bub = bub - Aub[:, i] * L[i]
                 # We now have a nonzero initial value for the objective
                 # function as well.
                 f0 = f0 - cc[i] * L[i]
@@ -697,7 +731,7 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         # Add the slack variables to the tableau
         np.fill_diagonal(T[meq:m, n:n+n_slack], 1)
 
-    # Further setup the tableau
+    # Further set up the tableau.
     # If a row corresponds to an equality constraint or a negative b (a lower
     # bound constraint), then an artificial variable is added for that row.
     # Also, if b is negative, first flip the signs in that constraint.
@@ -776,12 +810,12 @@ def _linprog_simplex(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     if status in (0, 1):
         if disp:
             print(messages[status])
-            print("         Current function value: {: <12.6f}".format(obj))
-            print("         Iterations: {:d}".format(nit2))
+            print("         Current function value: {0: <12.6f}".format(obj))
+            print("         Iterations: {0:d}".format(nit2))
     else:
         if disp:
             print(messages[status])
-            print("         Iterations: {:d}".format(nit2))
+            print("         Iterations: {0:d}".format(nit2))
 
     return OptimizeResult(x=x, fun=obj, nit=int(nit2), status=status, slack=slack,
                   message=messages[status], success=(status == 0))
@@ -805,16 +839,16 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     ----------
     c : array_like
         Coefficients of the linear objective function to be minimized.
-    A_ub :
+    A_ub : array_like, optional
         2-D array which, when matrix-multiplied by x, gives the values of the
         upper-bound inequality constraints at x.
-    b_ub : array_like
+    b_ub : array_like, optional
         1-D array of values representing the upper-bound of each inequality
         constraint (row) in A_ub.
-    A_eq : array_like
+    A_eq : array_like, optional
         2-D array which, when matrix-multiplied by x, gives the values of the
         equality constraints at x.
-    b_eq : array_like
+    b_eq : array_like, optional
         1-D array of values representing the RHS of each equality constraint
         (row) in A_eq.
     bounds : sequence, optional
@@ -825,7 +859,8 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         If a sequence containing a single tuple is provided, then ``min`` and
         ``max`` will be applied to all variables in the problem.
     method : str, optional
-        Type of solver.  At this time only 'simplex' is supported.
+        Type of solver.  At this time only 'simplex' is supported
+        :ref:`(see here) <optimize.linprog-simplex>`.
     callback : callable, optional
         If a callback function is provide, it will be called within each
         iteration of the simplex algorithm. The callback must have the signature
@@ -856,6 +891,8 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
         x : ndarray
             The independent variable vector which optimizes the linear
             programming problem.
+        fun : float
+            Value of the objective function.
         slack : ndarray
             The values of the slack variables.  Each slack variable corresponds
             to an inequality constraint.  If the slack is zero, then the
@@ -883,7 +920,7 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     Notes
     -----
     This section describes the available solvers that can be selected by the
-    'method' parameter. The default method is *Simplex*.
+    'method' parameter. The default method is :ref:`Simplex <optimize.linprog-simplex>`.
 
     Method *Simplex* uses the Simplex algorithm (as it relates to Linear
     Programming, NOT the Nelder-Mead Simplex) [1]_, [2]_. This algorithm
@@ -928,18 +965,20 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     >>> b = [6, 4]
     >>> x0_bounds = (None, None)
     >>> x1_bounds = (-3, None)
+    >>> from scipy.optimize import linprog
     >>> res = linprog(c, A_ub=A, b_ub=b, bounds=(x0_bounds, x1_bounds),
     ...               options={"disp": True})
-    >>> print(res)
     Optimization terminated successfully.
-         Current function value: -11.428571
-         Iterations: 2
-    status: 0
-    success: True
-    fun: -11.428571428571429
-    x: array([-1.14285714,  2.57142857])
-    message: 'Optimization terminated successfully.'
-    nit: 2
+         Current function value: -22.000000
+         Iterations: 1
+    >>> print(res)
+         fun: -22.0
+     message: 'Optimization terminated successfully.'
+         nit: 1
+       slack: array([ 39.,   0.])
+      status: 0
+     success: True
+           x: array([ 10.,  -3.])
 
     Note the actual objective value is 11.428571.  In this case we minimized
     the negative of the objective function.

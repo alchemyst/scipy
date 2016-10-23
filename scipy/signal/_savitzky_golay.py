@@ -58,6 +58,7 @@ def savgol_coeffs(window_length, polyorder, deriv=0, delta=1.0, pos=None,
 
     Examples
     --------
+    >>> from scipy.signal import savgol_coeffs
     >>> savgol_coeffs(5, 2)
     array([-0.08571429,  0.34285714,  0.48571429,  0.34285714, -0.08571429])
     >>> savgol_coeffs(5, 2, deriv=1)
@@ -76,7 +77,7 @@ def savgol_coeffs(window_length, polyorder, deriv=0, delta=1.0, pos=None,
     derivative at the last position.  When dotted with `x` the result should
     be 6.
 
-    >>> x = array([1, 0, 1, 4, 9])
+    >>> x = np.array([1, 0, 1, 4, 9])
     >>> c = savgol_coeffs(5, 2, pos=4, deriv=1, use='dot')
     >>> c.dot(x)
     6.0000000000000018
@@ -116,18 +117,13 @@ def savgol_coeffs(window_length, polyorder, deriv=0, delta=1.0, pos=None,
     # from -pos to window_length - pos - 1.  The powers (i.e. rows) range
     # from 0 to polyorder.  (That is, A is a vandermonde matrix, but not
     # necessarily square.)
-    x = np.arange(-pos, window_length - pos)
+    x = np.arange(-pos, window_length - pos, dtype=float)
     if use == "conv":
         # Reverse so that result can be used in a convolution.
         x = x[::-1]
 
     order = np.arange(polyorder + 1).reshape(-1, 1)
-    if order.size == 1:
-        # Avoid spurious DeprecationWarning in numpy 1.8.0 for
-        # ``[1] ** [[2]]``, see numpy gh-4145.
-        A = np.atleast_2d(x ** order[0, 0])
-    else:
-        A = x ** order
+    A = x ** order
 
     # y determines which order derivative is returned.
     y = np.zeros(polyorder + 1)
@@ -305,13 +301,14 @@ def savgol_filter(x, window_length, polyorder, deriv=0, delta=1.0,
 
     Examples
     --------
+    >>> from scipy.signal import savgol_filter
     >>> np.set_printoptions(precision=2)  # For compact display.
     >>> x = np.array([2, 2, 5, 2, 1, 0, 1, 4, 9])
 
     Filter with a window length of 5 and a degree 2 polynomial.  Use
     the defaults for all other parameters.
 
-    >>> y = savgol_filter(x, 5, 2)
+    >>> savgol_filter(x, 5, 2)
     array([ 1.66,  3.17,  3.54,  2.86,  0.66,  0.17,  1.  ,  4.  ,  9.  ])
 
     Note that the last five values in x are samples of a parabola, so

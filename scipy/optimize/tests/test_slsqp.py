@@ -7,6 +7,7 @@ from numpy.testing import (assert_, assert_array_almost_equal, TestCase,
                            assert_allclose, assert_equal, run_module_suite)
 import numpy as np
 
+from scipy._lib._testutils import knownfailure_overridable
 from scipy.optimize import fmin_slsqp, minimize
 
 
@@ -120,6 +121,8 @@ class TestSLSQP(TestCase):
                            method='SLSQP', options=self.opts)
         assert_(res['success'], res['message'])
         assert_allclose(res.x, [2.5, 0.5])
+        assert_(2.5 <= res.x[0])
+        assert_(res.x[1] <= 0.5)
 
     def test_minimize_unbounded_combined(self):
         # Minimize, method='SLSQP': unbounded, combined function and jacobian.
@@ -210,6 +213,8 @@ class TestSLSQP(TestCase):
                        options=self.opts)
         assert_(res['success'], res['message'])
         assert_allclose(res.x, [0.8, 0.8], atol=1e-3)
+        assert_(-0.8 <= res.x[0] <= 1)
+        assert_(-1 <= res.x[1] <= 0.8)
 
     # fmin_slsqp
     def test_unbounded_approximated(self):
@@ -281,6 +286,8 @@ class TestSLSQP(TestCase):
         x, fx, its, imode, smode = res
         assert_(imode == 0, imode)
         assert_array_almost_equal(x, [0.8, 0.8], decimal=3)
+        assert_(-0.8 <= x[0] <= 1)
+        assert_(-1 <= x[1] <= 0.8)
 
     def test_scalar_constraints(self):
         # Regression test for gh-2182
@@ -306,6 +313,53 @@ class TestSLSQP(TestCase):
         assert_(res['success'], res['message'])
         assert_(callback.been_called)
         assert_equal(callback.ncalls, res['nit'])
+
+    def test_inconsistent_linearization(self):
+        # SLSQP must be able to solve this problem, even if the
+        # linearized problem at the starting point is infeasible.
+
+        # Linearized constraints are
+        #
+        #    2*x0[0]*x[0] >= 1
+        #
+        # At x0 = [0, 1], the second constraint is clearly infeasible.
+        # This triggers a call with n2==1 in the LSQ subroutine.
+        x = [0, 1]
+        f1 = lambda x: x[0] + x[1] - 2
+        f2 = lambda x: x[0]**2 - 1
+        sol = minimize(
+            lambda x: x[0]**2 + x[1]**2,
+            x,
+            constraints=({'type':'eq','fun': f1},
+                         {'type':'ineq','fun': f2}),
+            bounds=((0,None), (0,None)),
+            method='SLSQP')
+        x = sol.x
+
+        assert_allclose(f1(x), 0, atol=1e-8)
+        assert_(f2(x) >= -1e-8)
+        assert_(sol.success, sol)
+
+    @knownfailure_overridable("This bug is not fixed")
+    def test_regression_5743(self):
+        # SLSQP must not indicate success for this problem,
+        # which is infeasible.
+        x = [1, 2]
+        sol = minimize(
+            lambda x: x[0]**2 + x[1]**2,
+            x,
+            constraints=({'type':'eq','fun': lambda x: x[0]+x[1]-1},
+                         {'type':'ineq','fun': lambda x: x[0]-2}),
+            bounds=((0,None), (0,None)),
+            method='SLSQP')
+        assert_(not sol.success, sol)
+
+    def test_gh_6676(self):
+        def func(x):
+            return (x[0] - 1)**2 + 2*(x[1] - 1)**2 + 0.5*(x[2] - 1)**2
+
+        sol = minimize(func, [0, 0, 0], method='SLSQP')
+        assert_(sol.jac.shape == (3,))
 
 
 if __name__ == "__main__":

@@ -17,15 +17,15 @@
  * Approximates the integral
  *
  *
- *                phi
- *                 -
- *                | |
- *                |                   2
+ *                 phi
+ *                  -
+ *                 | |
+ *                 |                   2
  * E(phi_\m)  =    |    sqrt( 1 - m sin t ) dt
- *                |
- *              | |    
- *               -
- *                0
+ *                 |
+ *               | |    
+ *                -
+ *                 0
  *
  * of amplitude phi and modulus m, using the arithmetic -
  * geometric mean algorithm.
@@ -38,10 +38,7 @@
  * [0, 1].
  *                      Relative error:
  * arithmetic   domain     # trials      peak         rms
- *    DEC        0,2         2000       1.9e-16     3.4e-17
  *    IEEE     -10,10      150000       3.3e-15     1.4e-16
- *
- *
  */
 
 
@@ -66,13 +63,13 @@ double ellie(double phi, double m)
     double lphi, t, E, denom, npio2;
     int d, mod, sign;
 
-    if (isnan(phi) || isnan(m))
+    if (cephes_isnan(phi) || cephes_isnan(m))
         return NPY_NAN;
     if (m > 1.0)
         return NPY_NAN;
-    if (isinf(phi))
+    if (cephes_isinf(phi))
         return phi;
-    if (isinf(m))
+    if (cephes_isinf(m))
         return -m;
     if (m == 0.0)
 	return (phi);

@@ -16,6 +16,10 @@ import numpy as np
 from scipy._lib.six import callable
 from scipy.optimize import _cobyla
 from .optimize import OptimizeResult, _check_unknown_options
+try:
+    from itertools import izip
+except ImportError:
+    izip = zip
 
 
 __all__ = ['fmin_cobyla']
@@ -26,7 +30,7 @@ def fmin_cobyla(func, x0, cons, args=(), consargs=None, rhobeg=1.0,
     """
     Minimize a function using the Constrained Optimization BY Linear
     Approximation (COBYLA) method. This method wraps a FORTRAN
-    implentation of the algorithm.
+    implementation of the algorithm.
 
     Parameters
     ----------
@@ -37,25 +41,26 @@ def fmin_cobyla(func, x0, cons, args=(), consargs=None, rhobeg=1.0,
     cons : sequence
         Constraint functions; must all be ``>=0`` (a single function
         if only 1 constraint). Each function takes the parameters `x`
-        as its first argument.
-    args : tuple
+        as its first argument, and it can return either a single number or
+        an array or list of numbers.
+    args : tuple, optional
         Extra arguments to pass to function.
-    consargs : tuple
+    consargs : tuple, optional
         Extra arguments to pass to constraint functions (default of None means
         use same extra arguments as those passed to func).
         Use ``()`` for no extra arguments.
-    rhobeg :
+    rhobeg : float, optional
         Reasonable initial changes to the variables.
-    rhoend :
+    rhoend : float, optional
         Final accuracy in the optimization (not precisely guaranteed). This
         is a lower bound on the size of the trust region.
-    iprint : {0, 1, 2, 3}
+    iprint : {0, 1, 2, 3}, optional
         Controls the frequency of output; 0 implies no output.  Deprecated.
-    disp : {0, 1, 2, 3}
+    disp : {0, 1, 2, 3}, optional
         Over-rides the iprint interface.  Preferred.
-    maxfun : int
+    maxfun : int, optional
         Maximum number of function evaluations.
-    catol : float
+    catol : float, optional
         Absolute tolerance for constraint violations.
 
     Returns
@@ -124,12 +129,8 @@ def fmin_cobyla(func, x0, cons, args=(), consargs=None, rhobeg=1.0,
         >>> def constr2(x):
         ...     return x[1]
         ...
+        >>> from scipy.optimize import fmin_cobyla
         >>> fmin_cobyla(objective, [0.0, 0.1], [constr1, constr2], rhoend=1e-7)
-
-           Normal return from subroutine COBYLA
-
-           NFVALS =   64   F =-5.000000E-01    MAXCV = 1.998401E-14
-           X =-7.071069E-01   7.071067E-01
         array([-0.70710685,  0.70710671])
 
     The exact solution is (-sqrt(2)/2, sqrt(2)/2).
@@ -181,22 +182,21 @@ def _minimize_cobyla(fun, x0, args=(), constraints=(),
     Minimize a scalar function of one or more variables using the
     Constrained Optimization BY Linear Approximation (COBYLA) algorithm.
 
-    Options for the COBYLA algorithm are:
-        rhobeg : float
-            Reasonable initial changes to the variables.
-        tol : float
-            Final accuracy in the optimization (not precisely guaranteed).
-            This is a lower bound on the size of the trust region.
-        disp : bool
-            Set to True to print convergence messages. If False,
-            `verbosity` is ignored as set to 0.
-        maxiter : int
-            Maximum number of function evaluations.
-        catol : float
-            Tolerance (absolute) for constraint violations
+    Options
+    -------
+    rhobeg : float
+        Reasonable initial changes to the variables.
+    tol : float
+        Final accuracy in the optimization (not precisely guaranteed).
+        This is a lower bound on the size of the trust region.
+    disp : bool
+        Set to True to print convergence messages. If False,
+        `verbosity` is ignored as set to 0.
+    maxiter : int
+        Maximum number of function evaluations.
+    catol : float
+        Tolerance (absolute) for constraint violations
 
-    This function is called by the `minimize` function with
-    `method=COBYLA`. It is not supposed to be called directly.
     """
     _check_unknown_options(unknown_options)
     maxfun = maxiter
@@ -232,12 +232,24 @@ def _minimize_cobyla(fun, x0, args=(), constraints=(),
         if 'args' not in con:
             con['args'] = ()
 
-    m = len(constraints)
+    # m is the total number of constraint values
+    # it takes into account that some constraints may be vector-valued
+    cons_lengths = []
+    for c in constraints:
+        f = c['fun'](x0, *c['args'])
+        try:
+            cons_length = len(f)
+        except TypeError:
+            cons_length = 1
+        cons_lengths.append(cons_length)
+    m = sum(cons_lengths)
 
     def calcfc(x, con):
         f = fun(x, *args)
-        for k, c in enumerate(constraints):
-            con[k] = c['fun'](x, *c['args'])
+        i = 0
+        for size, c in izip(cons_lengths, constraints):
+            con[i: i + size] = c['fun'](x, *c['args'])
+            i += size
         return f
 
     info = np.zeros(4, np.float64)

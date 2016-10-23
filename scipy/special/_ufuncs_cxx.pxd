@@ -7,4 +7,7 @@ cdef void *_export_faddeeva_erfcx
 cdef void *_export_faddeeva_erfcx_complex
 cdef void *_export_faddeeva_erfi
 cdef void *_export_faddeeva_erfi_complex
+cdef void *_export_faddeeva_log_ndtr
+cdef void *_export_faddeeva_ndtr
 cdef void *_export_faddeeva_w
+cdef void *_export_wrightomega

@@ -393,12 +393,12 @@ class MatFile4Reader(MatFileReader):
         while not self.end_of_stream():
             hdr, next_position = self.read_var_header()
             name = asstr(hdr.name)
-            if variable_names and name not in variable_names:
+            if variable_names is not None and name not in variable_names:
                 self.mat_stream.seek(next_position)
                 continue
             mdict[name] = self.read_var_array(hdr)
             self.mat_stream.seek(next_position)
-            if variable_names:
+            if variable_names is not None:
                 variable_names.remove(name)
                 if len(variable_names) == 0:
                     break
@@ -429,7 +429,7 @@ def arr_to_2d(arr, oned_as='row'):
     Parameters
     ----------
     arr : array
-    oned_as : {'row', 'column'}
+    oned_as : {'row', 'column'}, optional
        Whether to reshape 1D vectors as row vectors or column vectors.
        See documentation for ``matdims`` for more detail
 
@@ -493,7 +493,7 @@ class VarWriter4(object):
 
         Parameters
         ----------
-        arr : array-like
+        arr : array_like
            array to write
         name : str
            name in matlab workspace

@@ -758,7 +758,7 @@ def estimate_spectral_norm(A, its=20):
     A : :class:`scipy.sparse.linalg.LinearOperator`
         Matrix given as a :class:`scipy.sparse.linalg.LinearOperator` with the
         `matvec` and `rmatvec` methods (to apply the matrix and its adjoint).
-    its : int
+    its : int, optional
         Number of power method iterations.
 
     Returns
@@ -794,7 +794,7 @@ def estimate_spectral_norm_diff(A, B, its=20):
     B : :class:`scipy.sparse.linalg.LinearOperator`
         Second matrix given as a :class:`scipy.sparse.linalg.LinearOperator` with
         the `matvec` and `rmatvec` methods (to apply the matrix and its adjoint).
-    its : int
+    its : int, optional
         Number of power method iterations.
 
     Returns
@@ -884,6 +884,9 @@ def svd(A, eps_or_k, rand=True):
                     U, V, S = backend.idzp_svd(eps, A)
         else:
             k = int(eps_or_k)
+            if k > min(A.shape):
+                raise ValueError("Approximation rank %s exceeds min(A.shape) = "
+                                 " %s " % (k, min(A.shape)))
             if rand:
                 if real:
                     U, V, S = backend.iddr_asvd(A, k)

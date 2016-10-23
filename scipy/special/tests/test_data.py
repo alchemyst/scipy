@@ -18,7 +18,7 @@ from scipy.special import (
     nbdtrik, pdtrik,
     mathieu_a, mathieu_b, mathieu_cem, mathieu_sem, mathieu_modcem1,
     mathieu_modsem1, mathieu_modcem2, mathieu_modsem2,
-    ellip_harm, ellip_harm_2
+    ellip_harm, ellip_harm_2, spherical_jn, spherical_yn,
 )
 from scipy.integrate import IntegrationWarning
 
@@ -43,9 +43,11 @@ def data_gsl(func, dataname, *a, **kw):
     kw.setdefault('dataname', dataname)
     return FuncData(func, DATASETS_GSL[dataname], *a, **kw)
 
+
 def data_local(func, dataname, *a, **kw):
     kw.setdefault('dataname', dataname)
     return FuncData(func, DATASETS_LOCAL[dataname], *a, **kw)
+
 
 def ellipk_(k):
     return ellipk(k*k)
@@ -181,6 +183,12 @@ def poch_minus(z, m):
 def sph_jn_(n, x):
     return sph_jn(n.astype('l'), x)[0][-1]
 
+def spherical_jn_(n, x):
+    return spherical_jn(n.astype('l'), x)
+
+def spherical_yn_(n, x):
+    return spherical_yn(n.astype('l'), x)
+
 def sph_yn_(n, x):
     return sph_yn(n.astype('l'), x)[0][-1]
 
@@ -188,10 +196,18 @@ def sph_harm_(m, n, theta, phi):
     y = sph_harm(m, n, theta, phi)
     return (y.real, y.imag)
 
+def cexpm1(x, y):
+    z = expm1(x + 1j*y)
+    return z.real, z.imag
+
+def clog1p(x, y):
+    z = log1p(x + 1j*y)
+    return z.real, z.imag
+
 def test_boost():
     TESTS = [
         data(arccosh, 'acosh_data_ipp-acosh_data', 0, 1, rtol=5e-13),
-        data(arccosh, 'acosh_data_ipp-acosh_data', 0j, 1, rtol=5e-14),
+        data(arccosh, 'acosh_data_ipp-acosh_data', 0j, 1, rtol=5e-13),
 
         data(arcsinh, 'asinh_data_ipp-asinh_data', 0, 1, rtol=1e-11),
         data(arcsinh, 'asinh_data_ipp-asinh_data', 0j, 1, rtol=1e-11),
@@ -243,7 +259,7 @@ def test_boost():
         data(btdtrib, 'ibeta_inva_data_ipp-ibeta_inva_data', (0,2,1), 5, rtol=5e-9),
         data(btdtrib_comp, 'ibeta_inva_data_ipp-ibeta_inva_data', (0,2,1), 6, rtol=5e-9),
 
-        data(binom, 'binomial_data_ipp-binomial_data', (0,1), 2, rtol=1e-15),
+        data(binom, 'binomial_data_ipp-binomial_data', (0,1), 2, rtol=1e-13),
         data(binom, 'binomial_large_data_ipp-binomial_large_data', (0,1), 2, rtol=5e-13),
 
         data(bdtrik, 'binomial_quantile_ipp-binomial_quantile_data', (2,0,1), 3, rtol=5e-9),
@@ -264,7 +280,7 @@ def test_boost():
         data(digamma, 'digamma_root_data_ipp-digamma_root_data', 0, 1, rtol=1e-11),
         data(digamma, 'digamma_root_data_ipp-digamma_root_data', 0j, 1, rtol=1e-11),
         data(digamma, 'digamma_small_data_ipp-digamma_small_data', 0, 1),
-        data(digamma, 'digamma_small_data_ipp-digamma_small_data', 0j, 1),
+        data(digamma, 'digamma_small_data_ipp-digamma_small_data', 0j, 1, rtol=1e-14),
 
         data(ellipk_, 'ellint_k_data_ipp-ellint_k_data', 0, 1),
         data(ellipkinc_, 'ellint_f_data_ipp-ellint_f_data', (0,1), 2, rtol=1e-14),
@@ -273,10 +289,10 @@ def test_boost():
 
         data(erf, 'erf_data_ipp-erf_data', 0, 1),
         data(erf, 'erf_data_ipp-erf_data', 0j, 1, rtol=1e-13),
-        data(erfc, 'erf_data_ipp-erf_data', 0, 2),
+        data(erfc, 'erf_data_ipp-erf_data', 0, 2, rtol=6e-15),
         data(erf, 'erf_large_data_ipp-erf_large_data', 0, 1),
         data(erf, 'erf_large_data_ipp-erf_large_data', 0j, 1),
-        data(erfc, 'erf_large_data_ipp-erf_large_data', 0, 2),
+        data(erfc, 'erf_large_data_ipp-erf_large_data', 0, 2, rtol=4e-14),
         data(erf, 'erf_small_data_ipp-erf_small_data', 0, 1),
         data(erf, 'erf_small_data_ipp-erf_small_data', 0j, 1, rtol=1e-13),
         data(erfc, 'erf_small_data_ipp-erf_small_data', 0, 2),
@@ -298,7 +314,7 @@ def test_boost():
         data(gamma, 'test_gamma_data_ipp-near_2', 0, 1),
         data(gamma, 'test_gamma_data_ipp-near_m10', 0, 1),
         data(gamma, 'test_gamma_data_ipp-near_m55', 0, 1, rtol=7e-12),
-        data(gamma, 'test_gamma_data_ipp-factorials', 0, 1, rtol=1e-14),
+        data(gamma, 'test_gamma_data_ipp-factorials', 0, 1, rtol=4e-14),
         data(gamma, 'test_gamma_data_ipp-near_0', 0j, 1, rtol=2e-9),
         data(gamma, 'test_gamma_data_ipp-near_1', 0j, 1, rtol=2e-9),
         data(gamma, 'test_gamma_data_ipp-near_2', 0j, 1, rtol=2e-9),
@@ -315,22 +331,22 @@ def test_boost():
         data(gammainc, 'igamma_small_data_ipp-igamma_small_data', (0,1), 5, rtol=5e-15),
         data(gammainc, 'igamma_med_data_ipp-igamma_med_data', (0,1), 5, rtol=2e-13),
         data(gammainc, 'igamma_int_data_ipp-igamma_int_data', (0,1), 5, rtol=2e-13),
-        data(gammainc, 'igamma_big_data_ipp-igamma_big_data', (0,1), 5, rtol=2e-9),
+        data(gammainc, 'igamma_big_data_ipp-igamma_big_data', (0,1), 5, rtol=1e-12),
 
         data(gdtr_, 'igamma_small_data_ipp-igamma_small_data', (0,1), 5, rtol=1e-13),
         data(gdtr_, 'igamma_med_data_ipp-igamma_med_data', (0,1), 5, rtol=2e-13),
         data(gdtr_, 'igamma_int_data_ipp-igamma_int_data', (0,1), 5, rtol=2e-13),
         data(gdtr_, 'igamma_big_data_ipp-igamma_big_data', (0,1), 5, rtol=2e-9),
 
-        data(gammaincc, 'igamma_small_data_ipp-igamma_small_data', (0,1), 3, rtol=8e-5),
+        data(gammaincc, 'igamma_small_data_ipp-igamma_small_data', (0,1), 3, rtol=1e-13),
         data(gammaincc, 'igamma_med_data_ipp-igamma_med_data', (0,1), 3, rtol=2e-13),
         data(gammaincc, 'igamma_int_data_ipp-igamma_int_data', (0,1), 3, rtol=4e-14),
-        data(gammaincc, 'igamma_big_data_ipp-igamma_big_data', (0,1), 3, rtol=2e-9),
+        data(gammaincc, 'igamma_big_data_ipp-igamma_big_data', (0,1), 3, rtol=1e-11),
 
-        data(gdtrc_, 'igamma_small_data_ipp-igamma_small_data', (0,1), 3, rtol=8e-5),
+        data(gdtrc_, 'igamma_small_data_ipp-igamma_small_data', (0,1), 3, rtol=1e-13),
         data(gdtrc_, 'igamma_med_data_ipp-igamma_med_data', (0,1), 3, rtol=2e-13),
         data(gdtrc_, 'igamma_int_data_ipp-igamma_int_data', (0,1), 3, rtol=4e-14),
-        data(gdtrc_, 'igamma_big_data_ipp-igamma_big_data', (0,1), 3, rtol=2e-9),
+        data(gdtrc_, 'igamma_big_data_ipp-igamma_big_data', (0,1), 3, rtol=1e-11),
 
         data(gdtrib_, 'igamma_inva_data_ipp-igamma_inva_data', (1,0), 2, rtol=5e-9),
         data(gdtrib_comp, 'igamma_inva_data_ipp-igamma_inva_data', (1,0), 3, rtol=5e-9),
@@ -405,13 +421,14 @@ def test_boost():
         data(chndtr, 'nccs_ipp-nccs', (2,0,1), 3, rtol=3e-5),
         data(chndtr, 'nccs_big_ipp-nccs_big', (2,0,1), 3, rtol=5e-4, knownfailure='chndtr inaccurate some points'),
 
-        data(sph_jn_, 'sph_bessel_data_ipp-sph_bessel_data', (0,1), 2, vectorized=False, knownfailure='sph_jn inaccurate at large n, small x'),
-        data(sph_yn_, 'sph_neumann_data_ipp-sph_neumann_data', (0,1), 2, rtol=4e-15, vectorized=False),
         data(sph_harm_, 'spherical_harmonic_ipp-spherical_harmonic', (1,0,3,2), (4,5), rtol=5e-11,
              param_filter=(lambda p: np.ones(p.shape, '?'),
                            lambda p: np.ones(p.shape, '?'),
                            lambda p: np.logical_and(p < 2*np.pi, p >= 0),
                            lambda p: np.logical_and(p < np.pi, p >= 0))),
+
+        data(spherical_jn_, 'sph_bessel_data_ipp-sph_bessel_data', (0,1), 2, rtol=1e-13),
+        data(spherical_yn_, 'sph_neumann_data_ipp-sph_neumann_data', (0,1), 2, rtol=8e-15),
 
         # -- not used yet (function does not exist in scipy):
         # 'ellint_pi2_data_ipp-ellint_pi2_data',
@@ -452,11 +469,16 @@ def test_gsl():
     for test in TESTS:
         yield _test_factory, test
 
+
 def test_local():
     TESTS = [
         data_local(ellipkinc, 'ellipkinc_neg_m', (0, 1), 2),
         data_local(ellipkm1, 'ellipkm1', 0, 1),
         data_local(ellipeinc, 'ellipeinc_neg_m', (0, 1), 2),
+        data_local(clog1p, 'log1p_expm1_complex', (0,1), (2,3), rtol=1e-14),
+        data_local(cexpm1, 'log1p_expm1_complex', (0,1), (4,5), rtol=1e-14),
+        data_local(gammainc, 'gammainc', (0, 1), 2, rtol=1e-12),
+        data_local(gammaincc, 'gammaincc', (0, 1), 2, rtol=1e-11)
     ]
 
     for test in TESTS:
@@ -471,6 +493,19 @@ def test_local():
         warnings.simplefilter("ignore", category=IntegrationWarning)
 
         for test in TESTS:
+            yield _test_factory, test
+
+    # sph_jn, sph_yn are deprecated; silence the DeprecationWarning noise 
+    TESTS_DEP = [
+        data(sph_jn_, 'sph_bessel_data_ipp-sph_bessel_data', (0,1), 2,
+            vectorized=False,
+            knownfailure='sph_jn inaccurate at large n, small x'),
+        data(sph_yn_, 'sph_neumann_data_ipp-sph_neumann_data', (0,1), 2,
+            rtol=4e-15, vectorized=False),
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=DeprecationWarning)
+        for test in TESTS_DEP:
             yield _test_factory, test
 
 

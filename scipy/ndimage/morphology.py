@@ -79,6 +79,7 @@ def iterate_structure(structure, iterations, origin=None):
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> struct = ndimage.generate_binary_structure(2, 1)
     >>> struct.astype(int)
     array([[0, 1, 0],
@@ -156,6 +157,7 @@ def generate_binary_structure(rank, connectivity):
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> struct = ndimage.generate_binary_structure(2, 1)
     >>> struct
     array([[False,  True, False],
@@ -314,7 +316,7 @@ def binary_erosion(input, structure=None, iterations=1, mask=None,
         By default, a new array is created.
     origin : int or tuple of ints, optional
         Placement of the filter, by default 0.
-    border_value : int (cast to 0 or 1)
+    border_value : int (cast to 0 or 1), optional
         Value at the border in the output array.
 
     Returns
@@ -342,7 +344,8 @@ def binary_erosion(input, structure=None, iterations=1, mask=None,
 
     Examples
     --------
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[1:6, 2:5] = 1
     >>> a
     array([[0, 0, 0, 0, 0, 0, 0],
@@ -401,7 +404,7 @@ def binary_dilation(input, structure=None, iterations=1, mask=None,
         By default, a new array is created.
     origin : int or tuple of ints, optional
         Placement of the filter, by default 0.
-    border_value : int (cast to 0 or 1)
+    border_value : int (cast to 0 or 1), optional
         Value at the border in the output array.
 
     Returns
@@ -429,6 +432,7 @@ def binary_dilation(input, structure=None, iterations=1, mask=None,
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> a = np.zeros((5, 5))
     >>> a[2, 2] = 1
     >>> a
@@ -555,7 +559,8 @@ def binary_opening(input, structure=None, iterations=1, output=None,
 
     Examples
     --------
-    >>> a = np.zeros((5,5), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((5,5), dtype=int)
     >>> a[1:4, 1:4] = 1; a[4, 4] = 1
     >>> a
     array([[0, 0, 0, 0, 0],
@@ -564,27 +569,27 @@ def binary_opening(input, structure=None, iterations=1, output=None,
            [0, 1, 1, 1, 0],
            [0, 0, 0, 0, 1]])
     >>> # Opening removes small objects
-    >>> ndimage.binary_opening(a, structure=np.ones((3,3))).astype(np.int)
+    >>> ndimage.binary_opening(a, structure=np.ones((3,3))).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 1, 1, 1, 0],
            [0, 1, 1, 1, 0],
            [0, 1, 1, 1, 0],
            [0, 0, 0, 0, 0]])
     >>> # Opening can also smooth corners
-    >>> ndimage.binary_opening(a).astype(np.int)
+    >>> ndimage.binary_opening(a).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 0, 1, 0, 0],
            [0, 1, 1, 1, 0],
            [0, 0, 1, 0, 0],
            [0, 0, 0, 0, 0]])
     >>> # Opening is the dilation of the erosion of the input
-    >>> ndimage.binary_erosion(a).astype(np.int)
+    >>> ndimage.binary_erosion(a).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0],
            [0, 0, 1, 0, 0],
            [0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0]])
-    >>> ndimage.binary_dilation(ndimage.binary_erosion(a)).astype(np.int)
+    >>> ndimage.binary_dilation(ndimage.binary_erosion(a)).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 0, 1, 0, 0],
            [0, 1, 1, 1, 0],
@@ -660,7 +665,8 @@ def binary_closing(input, structure=None, iterations=1, output=None,
 
     Examples
     --------
-    >>> a = np.zeros((5,5), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((5,5), dtype=int)
     >>> a[1:-1, 1:-1] = 1; a[2,2] = 0
     >>> a
     array([[0, 0, 0, 0, 0],
@@ -669,20 +675,20 @@ def binary_closing(input, structure=None, iterations=1, output=None,
            [0, 1, 1, 1, 0],
            [0, 0, 0, 0, 0]])
     >>> # Closing removes small holes
-    >>> ndimage.binary_closing(a).astype(np.int)
+    >>> ndimage.binary_closing(a).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 1, 1, 1, 0],
            [0, 1, 1, 1, 0],
            [0, 1, 1, 1, 0],
            [0, 0, 0, 0, 0]])
     >>> # Closing is the erosion of the dilation of the input
-    >>> ndimage.binary_dilation(a).astype(np.int)
+    >>> ndimage.binary_dilation(a).astype(int)
     array([[0, 1, 1, 1, 0],
            [1, 1, 1, 1, 1],
            [1, 1, 1, 1, 1],
            [1, 1, 1, 1, 1],
            [0, 1, 1, 1, 0]])
-    >>> ndimage.binary_erosion(ndimage.binary_dilation(a)).astype(np.int)
+    >>> ndimage.binary_erosion(ndimage.binary_dilation(a)).astype(int)
     array([[0, 0, 0, 0, 0],
            [0, 1, 1, 1, 0],
            [0, 1, 1, 1, 0],
@@ -690,7 +696,7 @@ def binary_closing(input, structure=None, iterations=1, output=None,
            [0, 0, 0, 0, 0]])
 
 
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[1:6, 2:5] = 1; a[1:3,3] = 0
     >>> a
     array([[0, 0, 0, 0, 0, 0, 0],
@@ -702,7 +708,7 @@ def binary_closing(input, structure=None, iterations=1, output=None,
            [0, 0, 0, 0, 0, 0, 0]])
     >>> # In addition to removing holes, closing can also
     >>> # coarsen boundaries with fine hollows.
-    >>> ndimage.binary_closing(a).astype(np.int)
+    >>> ndimage.binary_closing(a).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0],
            [0, 0, 1, 0, 1, 0, 0],
            [0, 0, 1, 1, 1, 0, 0],
@@ -710,7 +716,7 @@ def binary_closing(input, structure=None, iterations=1, output=None,
            [0, 0, 1, 1, 1, 0, 0],
            [0, 0, 1, 1, 1, 0, 0],
            [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_closing(a, structure=np.ones((2,2))).astype(np.int)
+    >>> ndimage.binary_closing(a, structure=np.ones((2,2))).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0],
            [0, 0, 1, 1, 1, 0, 0],
            [0, 0, 1, 1, 1, 0, 0],
@@ -778,7 +784,8 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
 
     Examples
     --------
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[1, 1] = 1; a[2:4, 2:4] = 1; a[4:6, 4:6] = 1
     >>> a
     array([[0, 0, 0, 0, 0, 0, 0],
@@ -794,7 +801,7 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
            [0, 1, 1],
            [0, 1, 1]])
     >>> # Find the matches of structure1 in the array a
-    >>> ndimage.binary_hit_or_miss(a, structure1=structure1).astype(np.int)
+    >>> ndimage.binary_hit_or_miss(a, structure1=structure1).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0],
            [0, 0, 1, 0, 0, 0, 0],
@@ -805,7 +812,7 @@ def binary_hit_or_miss(input, structure1=None, structure2=None,
     >>> # Change the origin of the filter
     >>> # origin1=1 is equivalent to origin1=(1,1) here
     >>> ndimage.binary_hit_or_miss(a, structure1=structure1,\\
-    ... origin1=1).astype(np.int)
+    ... origin1=1).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0],
@@ -848,18 +855,20 @@ def binary_propagation(input, structure=None, mask=None,
     ----------
     input : array_like
         Binary image to be propagated inside `mask`.
-    structure : array_like
+    structure : array_like, optional
         Structuring element used in the successive dilations. The output
         may depend on the structuring element, especially if `mask` has
         several connex components. If no structuring element is
         provided, an element is generated with a squared connectivity equal
         to one.
-    mask : array_like
+    mask : array_like, optional
         Binary mask defining the region into which `input` is allowed to
         propagate.
     output : ndarray, optional
         Array of the same shape as input, into which the output is placed.
         By default, a new array is created.
+    border_value : int (cast to 0 or 1), optional
+        Value at the border in the output array.
     origin : int or tuple of ints, optional
         Placement of the filter, by default 0.
 
@@ -885,9 +894,10 @@ def binary_propagation(input, structure=None, mask=None,
 
     Examples
     --------
-    >>> input = np.zeros((8, 8), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> input = np.zeros((8, 8), dtype=int)
     >>> input[2, 2] = 1
-    >>> mask = np.zeros((8, 8), dtype=np.int)
+    >>> mask = np.zeros((8, 8), dtype=int)
     >>> mask[1:4, 1:4] = mask[4, 4]  = mask[6:8, 6:8] = 1
     >>> input
     array([[0, 0, 0, 0, 0, 0, 0, 0],
@@ -907,7 +917,7 @@ def binary_propagation(input, structure=None, mask=None,
            [0, 0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 1, 1],
            [0, 0, 0, 0, 0, 0, 1, 1]])
-    >>> ndimage.binary_propagation(input, mask=mask).astype(np.int)
+    >>> ndimage.binary_propagation(input, mask=mask).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0, 0],
            [0, 1, 1, 1, 0, 0, 0, 0],
            [0, 1, 1, 1, 0, 0, 0, 0],
@@ -917,7 +927,7 @@ def binary_propagation(input, structure=None, mask=None,
            [0, 0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0]])
     >>> ndimage.binary_propagation(input, mask=mask,\\
-    ... structure=np.ones((3,3))).astype(np.int)
+    ... structure=np.ones((3,3))).astype(int)
     array([[0, 0, 0, 0, 0, 0, 0, 0],
            [0, 1, 1, 1, 0, 0, 0, 0],
            [0, 1, 1, 1, 0, 0, 0, 0],
@@ -928,7 +938,7 @@ def binary_propagation(input, structure=None, mask=None,
            [0, 0, 0, 0, 0, 0, 0, 0]])
 
     >>> # Comparison between opening and erosion+propagation
-    >>> a = np.zeros((6,6), dtype=np.int)
+    >>> a = np.zeros((6,6), dtype=int)
     >>> a[2:5, 2:5] = 1; a[0, 0] = 1; a[5, 5] = 1
     >>> a
     array([[1, 0, 0, 0, 0, 0],
@@ -937,7 +947,7 @@ def binary_propagation(input, structure=None, mask=None,
            [0, 0, 1, 1, 1, 0],
            [0, 0, 1, 1, 1, 0],
            [0, 0, 0, 0, 0, 1]])
-    >>> ndimage.binary_opening(a).astype(np.int)
+    >>> ndimage.binary_opening(a).astype(int)
     array([[0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0],
            [0, 0, 0, 1, 0, 0],
@@ -952,7 +962,7 @@ def binary_propagation(input, structure=None, mask=None,
            [0, 0, 0, 1, 0, 0],
            [0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_propagation(b, mask=a).astype(np.int)
+    >>> ndimage.binary_propagation(b, mask=a).astype(int)
     array([[0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0],
            [0, 0, 1, 1, 1, 0],
@@ -1011,6 +1021,7 @@ def binary_fill_holes(input, structure=None, output=None, origin=0):
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> a = np.zeros((5, 5), dtype=int)
     >>> a[1:4, 1:4] = 1
     >>> a[2,2] = 0
@@ -1115,7 +1126,8 @@ def grey_erosion(input, size=None, footprint=None, structure=None,
 
     Examples
     --------
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[1:6, 1:6] = 3
     >>> a[4,4] = 2; a[2,3] = 1
     >>> a
@@ -1224,7 +1236,8 @@ def grey_dilation(input, size=None, footprint=None, structure=None,
 
     Examples
     --------
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[2:5, 2:5] = 1
     >>> a[4,4] = 2; a[2,3] = 3
     >>> a
@@ -1359,6 +1372,7 @@ def grey_opening(input, size=None, footprint=None, structure=None,
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> a = np.arange(36).reshape((6,6))
     >>> a[3, 3] = 50
     >>> a
@@ -1439,6 +1453,7 @@ def grey_closing(input, size=None, footprint=None, structure=None,
 
     Examples
     --------
+    >>> from scipy import ndimage
     >>> a = np.arange(36).reshape((6,6))
     >>> a[3,3] = 0
     >>> a
@@ -1524,7 +1539,8 @@ def morphological_gradient(input, size=None, footprint=None,
 
     Examples
     --------
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> from scipy import ndimage
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[2:5, 2:5] = 1
     >>> ndimage.morphological_gradient(a, size=(3,3))
     array([[0, 0, 0, 0, 0, 0, 0],
@@ -1545,7 +1561,7 @@ def morphological_gradient(input, size=None, footprint=None,
            [0, 1, 1, 1, 1, 1, 0],
            [0, 1, 1, 1, 1, 1, 0],
            [0, 0, 0, 0, 0, 0, 0]])
-    >>> a = np.zeros((7,7), dtype=np.int)
+    >>> a = np.zeros((7,7), dtype=int)
     >>> a[2:5, 2:5] = 1
     >>> a[4,4] = 2; a[2,3] = 3
     >>> a
@@ -1591,9 +1607,9 @@ def morphological_laplace(input, size=None, footprint=None,
         See `structure`.
     footprint : bool or ndarray, optional
         See `structure`.
-    structure : structure
+    structure : structure, optional
         Either `size`, `footprint`, or the `structure` must be provided.
-    output : ndarray
+    output : ndarray, optional
         An output array can optionally be provided.
     mode : {'reflect','constant','nearest','mirror', 'wrap'}, optional
         The mode parameter determines how the array borders are handled.
@@ -1602,7 +1618,7 @@ def morphological_laplace(input, size=None, footprint=None,
     cval : scalar, optional
         Value to fill past edges of input if mode is 'constant'.
         Default is 0.0
-    origin : origin
+    origin : origin, optional
         The origin parameter controls the placement of the filter.
 
     Returns
@@ -1691,7 +1707,7 @@ def black_tophat(input, size=None, footprint=None,
     ----------
     input : array_like
         Input.
-    size : tuple of ints
+    size : tuple of ints, optional
         Shape of a flat and full structuring element used for the filter.
         Optional if `footprint` or `structure` is provided.
     footprint : array of ints, optional
@@ -2013,7 +2029,7 @@ def distance_transform_edt(input, sampling=None,
         return_distances/return_indices must be True. Default is True.
     return_indices : bool, optional
         Whether to return indices matrix. Default is False.
-    distance : ndarray, optional
+    distances : ndarray, optional
         Used for output of distance array, must be of type float64.
     indices : ndarray, optional
         Used for output of indices, must be of type int32.
@@ -2040,12 +2056,12 @@ def distance_transform_edt(input, sampling=None,
 
     Examples
     --------
-    >>> a = np.array(([0,1,1,1,1],
-                      [0,0,1,1,1],
-                      [0,1,1,1,1],
-                      [0,1,1,1,0],
-                      [0,1,1,0,0]))
     >>> from scipy import ndimage
+    >>> a = np.array(([0,1,1,1,1],
+    ...               [0,0,1,1,1],
+    ...               [0,1,1,1,1],
+    ...               [0,1,1,1,0],
+    ...               [0,1,1,0,0]))
     >>> ndimage.distance_transform_edt(a)
     array([[ 0.    ,  1.    ,  1.4142,  2.2361,  3.    ],
            [ 0.    ,  0.    ,  1.    ,  2.    ,  2.    ],

@@ -10,7 +10,8 @@ import numpy as np
 from numpy import asarray, zeros, place, nan, mod, pi, extract, log, sqrt, \
     exp, cos, sin, polyval, polyint
 
-__all__ = ['sawtooth', 'square', 'gausspulse', 'chirp', 'sweep_poly']
+__all__ = ['sawtooth', 'square', 'gausspulse', 'chirp', 'sweep_poly',
+           'unit_impulse']
 
 
 def sawtooth(t, width=1):
@@ -32,7 +33,7 @@ def sawtooth(t, width=1):
     width : array_like, optional
         Width of the rising ramp as a proportion of the total cycle.
         Default is 1, producing a rising ramp, while 0 produces a falling
-        ramp.  `t` = 0.5 produces a triangle wave.
+        ramp.  `width` = 0.5 produces a triangle wave.
         If an array, causes wave shape to change over time, and must be the
         same length as t.
 
@@ -410,7 +411,7 @@ def sweep_poly(t, poly, phi=0):
     ----------
     t : ndarray
         Times at which to evaluate the waveform.
-    poly : 1-D array-like or instance of numpy.poly1d
+    poly : 1-D array_like or instance of numpy.poly1d
         The desired frequency expressed as a polynomial.  If `poly` is
         a list or ndarray of length n, then the elements of `poly` are
         the coefficients of the polynomial, and the instantaneous
@@ -479,3 +480,91 @@ def _sweep_poly_phase(t, poly):
     intpoly = polyint(poly)
     phase = 2 * pi * polyval(intpoly, t)
     return phase
+
+
+def unit_impulse(shape, idx=None, dtype=float):
+    """
+    Unit impulse signal (discrete delta function) or unit basis vector.
+
+    Parameters
+    ----------
+    shape : int or tuple of int
+        Number of samples in the output (1-D), or a tuple that represents the
+        shape of the output (N-D).
+    idx : None or int or tuple of int or 'mid', optional
+        Index at which the value is 1.  If None, defaults to the 0th element.
+        If ``idx='mid'``, the impulse will be centered at ``shape // 2`` in
+        all dimensions.  If an int, the impulse will be at `idx` in all
+        dimensions.
+    dtype : data-type, optional
+        The desired data-type for the array, e.g., `numpy.int8`.  Default is
+        `numpy.float64`.
+
+    Returns
+    -------
+    y : ndarray
+        Output array containing an impulse signal.
+
+    Notes
+    -----
+    The 1D case is also known as the Kronecker delta.
+
+    .. versionadded:: 0.19.0
+
+    Examples
+    --------
+    An impulse at the 0th element (:math:`\delta[n]`):
+
+    >>> from scipy import signal
+    >>> signal.unit_impulse(8)
+    array([ 1.,  0.,  0.,  0.,  0.,  0.,  0.,  0.])
+
+    Impulse offset by 2 samples (:math:`\delta[n-2]`):
+
+    >>> signal.unit_impulse(7, 2)
+    array([ 0.,  0.,  1.,  0.,  0.,  0.,  0.])
+
+    2-dimensional impulse, centered:
+
+    >>> signal.unit_impulse((3, 3), 'mid')
+    array([[ 0.,  0.,  0.],
+           [ 0.,  1.,  0.],
+           [ 0.,  0.,  0.]])
+
+    Impulse at (2, 2), using broadcasting:
+
+    >>> signal.unit_impulse((4, 4), 2)
+    array([[ 0.,  0.,  0.,  0.],
+           [ 0.,  0.,  0.,  0.],
+           [ 0.,  0.,  1.,  0.],
+           [ 0.,  0.,  0.,  0.]])
+
+    Plot the impulse response of a 4th-order Butterworth lowpass filter:
+
+    >>> imp = signal.unit_impulse(100, 'mid')
+    >>> b, a = signal.butter(4, 0.2)
+    >>> response = signal.lfilter(b, a, imp)
+
+    >>> import matplotlib.pyplot as plt
+    >>> plt.plot(np.arange(-50, 50), imp)
+    >>> plt.plot(np.arange(-50, 50), response)
+    >>> plt.margins(0.1, 0.1)
+    >>> plt.xlabel('Time [samples]')
+    >>> plt.ylabel('Amplitude')
+    >>> plt.grid(True)
+    >>> plt.show()
+
+    """
+    out = zeros(shape, dtype)
+
+    shape = np.atleast_1d(shape)
+
+    if idx is None:
+        idx = (0,) * len(shape)
+    elif idx == 'mid':
+        idx = tuple(shape // 2)
+    elif not hasattr(idx, "__iter__"):
+        idx = (idx,) * len(shape)
+
+    out[idx] = 1
+    return out

@@ -17,10 +17,11 @@ needs_sphinx = '1.1'
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 
 sys.path.insert(0, os.path.abspath('../sphinxext'))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.mathjax', 'numpydoc',
               'sphinx.ext.intersphinx', 'sphinx.ext.coverage',
-              'sphinx.ext.autosummary']
+              'sphinx.ext.autosummary', 'scipyoptdoc', 'doi_role']
 
 # Determine if the matplotlib has a recent enough version of the
 # plot_directive.
@@ -50,7 +51,7 @@ master_doc = 'index'
 
 # General substitutions.
 project = 'SciPy'
-copyright = '2008-2014, The Scipy community'
+copyright = '2008-2016, The Scipy community'
 
 # The default replacements for |version| and |release|, also used in various
 # other places throughout the built documents.
@@ -106,8 +107,8 @@ if os.path.isdir(themedir):
             "edit_link": True,
             "sidebar": "right",
             "scipy_org_logo": True,
-            "rootlinks": [("http://scipy.org/", "Scipy.org"),
-                          ("http://docs.scipy.org/", "Docs")]
+            "rootlinks": [("https://scipy.org/", "Scipy.org"),
+                          ("https://docs.scipy.org/", "Docs")]
         }
     else:
         # Default build
@@ -140,8 +141,7 @@ html_file_suffix = '.html'
 
 htmlhelp_basename = 'scipy'
 
-pngmath_use_preview = True
-pngmath_dvipng_args = ['-gamma', '1.5', '-D', '96', '-bg', 'Transparent']
+mathjax_path = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
 
 
 # -----------------------------------------------------------------------------
@@ -218,7 +218,7 @@ latex_use_modindex = False
 # -----------------------------------------------------------------------------
 intersphinx_mapping = {
         'http://docs.python.org/dev': None,
-        'http://docs.scipy.org/doc/numpy': None,
+        'https://docs.scipy.org/doc/numpy': None,
 }
 
 
@@ -344,12 +344,12 @@ def linkcode_resolve(domain, info):
         return None
 
     try:
-        source, lineno = inspect.findsource(obj)
+        source, lineno = inspect.getsourcelines(obj)
     except:
         lineno = None
 
     if lineno:
-        linespec = "#L%d" % (lineno + 1)
+        linespec = "#L%d-L%d" % (lineno, lineno + len(source) - 1)
     else:
         linespec = ""
 

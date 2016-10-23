@@ -79,36 +79,17 @@ class gaussian_kde(object):
 
     Methods
     -------
-    kde.evaluate(points) : ndarray
-        Evaluate the estimated pdf on a provided set of points.
-    kde(points) : ndarray
-        Same as kde.evaluate(points)
-    kde.integrate_gaussian(mean, cov) : float
-        Multiply pdf with a specified Gaussian and integrate over the whole
-        domain.
-    kde.integrate_box_1d(low, high) : float
-        Integrate pdf (1D only) between two bounds.
-    kde.integrate_box(low_bounds, high_bounds) : float
-        Integrate pdf over a rectangular space between low_bounds and
-        high_bounds.
-    kde.integrate_kde(other_kde) : float
-        Integrate two kernel density estimates multiplied together.
-    kde.pdf(points) : ndarray
-        Alias for ``kde.evaluate(points)``.
-    kde.logpdf(points) : ndarray
-        Equivalent to ``np.log(kde.evaluate(points))``.
-    kde.resample(size=None) : ndarray
-        Randomly sample a dataset from the estimated pdf.
-    kde.set_bandwidth(bw_method='scott') : None
-        Computes the bandwidth, i.e. the coefficient that multiplies the data
-        covariance matrix to obtain the kernel covariance matrix.
-        .. versionadded:: 0.11.0
-    kde.covariance_factor : float
-        Computes the coefficient (`kde.factor`) that multiplies the data
-        covariance matrix to obtain the kernel covariance matrix.
-        The default is `scotts_factor`.  A subclass can overwrite this method
-        to provide a different method, or set it through a call to
-        `kde.set_bandwidth`.
+    evaluate
+    __call__
+    integrate_gaussian
+    integrate_box_1d
+    integrate_box
+    integrate_kde
+    pdf
+    logpdf
+    resample
+    set_bandwidth
+    covariance_factor
 
     Notes
     -----
@@ -150,10 +131,10 @@ class gaussian_kde(object):
 
     >>> from scipy import stats
     >>> def measure(n):
-    >>>     "Measurement model, return two coupled measurements."
-    >>>     m1 = np.random.normal(size=n)
-    >>>     m2 = np.random.normal(scale=0.5, size=n)
-    >>>     return m1+m2, m1-m2
+    ...     "Measurement model, return two coupled measurements."
+    ...     m1 = np.random.normal(size=n)
+    ...     m2 = np.random.normal(scale=0.5, size=n)
+    ...     return m1+m2, m1-m2
 
     >>> m1, m2 = measure(2000)
     >>> xmin = m1.min()
@@ -172,8 +153,7 @@ class gaussian_kde(object):
     Plot the results:
 
     >>> import matplotlib.pyplot as plt
-    >>> fig = plt.figure()
-    >>> ax = fig.add_subplot(111)
+    >>> fig, ax = plt.subplots()
     >>> ax.imshow(np.rot90(Z), cmap=plt.cm.gist_earth_r,
     ...           extent=[xmin, xmax, ymin, ymax])
     >>> ax.plot(m1, m2, 'k.', markersize=2)
@@ -223,7 +203,7 @@ class gaussian_kde(object):
                     self.d)
                 raise ValueError(msg)
 
-        result = zeros((m,), dtype=np.float)
+        result = zeros((m,), dtype=float)
 
         if m >= self.n:
             # there are more points than data, so loop over data
@@ -265,7 +245,7 @@ class gaussian_kde(object):
 
         Raises
         ------
-        ValueError :
+        ValueError
             If the mean or covariance of the input Gaussian differs from
             the KDE's dimensionality.
 
@@ -283,12 +263,19 @@ class gaussian_kde(object):
 
         sum_cov = self.covariance + cov
 
+        # This will raise LinAlgError if the new cov matrix is not s.p.d
+        # cho_factor returns (ndarray, bool) where bool is a flag for whether
+        # or not ndarray is upper or lower triangular
+        sum_cov_chol = linalg.cho_factor(sum_cov)
+
         diff = self.dataset - mean
-        tdiff = dot(linalg.inv(sum_cov), diff)
+        tdiff = linalg.cho_solve(sum_cov_chol, diff)
+
+        sqrt_det = np.prod(np.diagonal(sum_cov_chol[0]))
+        norm_const = power(2 * pi, sum_cov.shape[0] / 2.0) * sqrt_det
 
         energies = sum(diff * tdiff, axis=0) / 2.0
-        result = sum(exp(-energies), axis=0) / sqrt(linalg.det(2 * pi *
-                                                        sum_cov)) / self.n
+        result = sum(exp(-energies), axis=0) / norm_const / self.n
 
         return result
 
@@ -401,7 +388,10 @@ class gaussian_kde(object):
             energies = sum(diff * tdiff, axis=0) / 2.0
             result += sum(exp(-energies), axis=0)
 
-        result /= sqrt(linalg.det(2 * pi * sum_cov)) * large.n * small.n
+        sqrt_det = np.prod(np.diagonal(sum_cov_chol[0]))
+        norm_const = power(2 * pi, sum_cov.shape[0] / 2.0) * sqrt_det
+
+        result /= norm_const * large.n * small.n
 
         return result
 
@@ -439,6 +429,11 @@ class gaussian_kde(object):
 
     #  Default method to calculate bandwidth, can be overwritten by subclass
     covariance_factor = scotts_factor
+    covariance_factor.__doc__ = """Computes the coefficient (`kde.factor`) that
+        multiplies the data covariance matrix to obtain the kernel covariance
+        matrix. The default is `scotts_factor`.  A subclass can overwrite this
+        method to provide a different method, or set it through a call to
+        `kde.set_bandwidth`."""
 
     def set_bandwidth(self, bw_method=None):
         """Compute the estimator bandwidth with given method.
@@ -462,6 +457,7 @@ class gaussian_kde(object):
 
         Examples
         --------
+        >>> import scipy.stats as stats
         >>> x1 = np.array([-7, -5, 1, 4, 5.])
         >>> kde = stats.gaussian_kde(x1)
         >>> xs = np.linspace(-10, 10, num=50)
@@ -471,8 +467,8 @@ class gaussian_kde(object):
         >>> kde.set_bandwidth(bw_method=kde.factor / 3.)
         >>> y3 = kde(xs)
 
-        >>> fig = plt.figure()
-        >>> ax = fig.add_subplot(111)
+        >>> import matplotlib.pyplot as plt
+        >>> fig, ax = plt.subplots()
         >>> ax.plot(x1, np.ones(x1.shape) / (4. * x1.size), 'bo',
         ...         label='Data points (rescaled)')
         >>> ax.plot(xs, y1, label='Scott (default)')

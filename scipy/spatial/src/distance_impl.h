@@ -84,13 +84,14 @@ chebyshev_distance_double(const double *u, const double *v, npy_intp n)
 static NPY_INLINE double
 canberra_distance_double(const double *u, const double *v, npy_intp n)
 {
-    double snum = 0.0, sdenom = 0.0, tot = 0.0;
+    double tot = 0.;
     npy_intp i;
 
     for (i = 0; i < n; i++) {
-        snum = fabs(u[i] - v[i]);
-        sdenom = fabs(u[i]) + fabs(v[i]);
-        if (sdenom > 0.0) {
+        double x = u[i], y = v[i];
+        double snum = fabs(x - y);
+        double sdenom = fabs(x) + fabs(y);
+        if (sdenom > 0.) {
             tot += snum / sdenom;
         }
     }
@@ -110,197 +111,11 @@ bray_curtis_distance_double(const double *u, const double *v, npy_intp n)
     return s1 / s2;
 }
 
-static NPY_INLINE double
-mahalanobis_distance(const double *u, const double *v, const double *covinv,
-                     double *dimbuf1, double *dimbuf2, npy_intp n)
-{
-    const double *covrow = covinv;
-    double s;
-    npy_intp i, j;
-
-    for (i = 0; i < n; i++) {
-        dimbuf1[i] = u[i] - v[i];
-    }
-    for (i = 0; i < n; i++) {
-        covrow = covinv + (i * n);
-        s = 0.0;
-        for (j = 0; j < n; j++) {
-            s += dimbuf1[j] * covrow[j];
-        }
-        dimbuf2[i] = s;
-    }
-    s = 0.0;
-    for (i = 0; i < n; i++) {
-        s += dimbuf1[i] * dimbuf2[i];
-    }
-    return sqrt(s);
-}
-
-static NPY_INLINE double
-hamming_distance_double(const double *u, const double *v, npy_intp n)
-{
-    double s = 0.0;
-    npy_intp i;
-
-    for (i = 0; i < n; i++) {
-        s += (u[i] != v[i]);
-    }
-    return s / n;
-}
-
-static NPY_INLINE double
-hamming_distance_char(const char *u, const char *v, npy_intp n)
-{
-    double s = 0.0;
-    npy_intp i;
-
-    for (i = 0; i < n; i++) {
-        s += (u[i] != v[i]);
-    }
-    return s / n;
-}
-
-static NPY_INLINE double
-yule_bool_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp ntt = 0, nff = 0, nft = 0, ntf = 0;
-
-    for (i = 0; i < n; i++) {
-        ntt += (u[i] && v[i]);
-        ntf += (u[i] && !v[i]);
-        nft += (!u[i] && v[i]);
-        nff += (!u[i] && !v[i]);
-    }
-    return (2.0 * ntf * nft) / ((double)ntt * nff + (double)ntf * nft);  
-}
-
-static NPY_INLINE double
-matching_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp nft = 0, ntf = 0;
-
-    for (i = 0; i < n; i++) {
-        ntf += (u[i] && !v[i]);
-        nft += (!u[i] && v[i]);
-    }
-    return (double)(ntf + nft) / (double)(n);
-}
-
-static NPY_INLINE double
-dice_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp ntt = 0, nft = 0, ntf = 0;
-
-    for (i = 0; i < n; i++) {
-        ntt += (u[i] && v[i]);
-        ntf += (u[i] && !v[i]);
-        nft += (!u[i] && v[i]);
-    }
-    return (double)(nft + ntf) / (2.0 * ntt + ntf + nft);
-}
-
-
-static NPY_INLINE double
-rogerstanimoto_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp ntt = 0, nff = 0, nft = 0, ntf = 0;
-
-    for (i = 0; i < n; i++) {
-        ntt += (u[i] && v[i]);
-        ntf += (u[i] && !v[i]);
-        nft += (!u[i] && v[i]);
-        nff += (!u[i] && !v[i]);
-    }
-    return (2.0 * (ntf + nft)) / ((double)ntt + nff + (2.0 * (ntf + nft)));
-}
-
-static NPY_INLINE double
-russellrao_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp ntt = 0;
-
-    for (i = 0; i < n; i++) {
-        ntt += (u[i] && v[i]);
-    }
-    return (double)(n - ntt) / n;
-}
-
-static NPY_INLINE double
-kulsinski_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp _i;
-    npy_intp ntt = 0, nft = 0, ntf = 0, nff = 0;
-
-    for (_i = 0; _i < n; _i++) {
-        ntt += (u[_i] && v[_i]);
-        ntf += (u[_i] && !v[_i]);
-        nft += (!u[_i] && v[_i]);
-        nff += (!u[_i] && !v[_i]);
-    }
-    return (double)(ntf + nft - ntt + n) / (double)(ntf + nft + n);
-}
-
-static NPY_INLINE double
-sokalsneath_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp _i;
-    npy_intp ntt = 0, nft = 0, ntf = 0;
-
-    for (_i = 0; _i < n; _i++) {
-        ntt += (u[_i] && v[_i]);
-        ntf += (u[_i] && !v[_i]);
-        nft += (!u[_i] && v[_i]);
-    }
-    return (2.0 * (ntf + nft)) / (2.0 * (ntf + nft) + ntt);
-}
-
-static NPY_INLINE double
-sokalmichener_distance_char(const char *u, const char *v, npy_intp n)
-{
-    npy_intp i;
-    npy_intp ntt = 0, nft = 0, ntf = 0, nff = 0;
-
-    for (i = 0; i < n; i++) {
-        ntt += (u[i] && v[i]);
-        nff += (!u[i] && !v[i]);
-        ntf += (u[i] && !v[i]);
-        nft += (!u[i] && v[i]);
-    }
-    return (2.0 * (ntf + nft)) / (2.0 * (ntf + nft) + ntt + nff);
-}
-
-static NPY_INLINE double
-jaccard_distance_double(const double *u, const double *v, npy_intp n)
-{
-    double denom = 0.0, num = 0.0;
-    npy_intp i;
-
-    for (i = 0; i < n; i++) {
-        num += (u[i] != v[i]) & ((u[i] != 0.0) | (v[i] != 0.0));
-        denom += (u[i] != 0.0) | (v[i] != 0.0);
-    }
-    return num / denom;
-}
-
-static NPY_INLINE double
-jaccard_distance_char(const char *u, const char *v, npy_intp n)
-{
-    double num = 0.0, denom = 0.0;
-    npy_intp i;
-
-    for (i = 0; i < n; i++) {
-        num += (u[i] != v[i]) & ((u[i] != 0) | (v[i] != 0));
-        denom += (u[i] != 0) | (v[i] != 0);
-    }
-    return num / denom;
-}
-
-/* XXX shouldn't we use BLAS for this? */
+/*
+ * Timings with various BLAS implementations (gh-5657) have shown that using
+ * OpenBLAS's cblas_ddot here can give some speedup, but only for high-d data
+ * and an untuned ATLAS is slower than rolling our own.
+ */
 static NPY_INLINE double
 dot_product(const double *u, const double *v, npy_intp n)
 {
@@ -314,6 +129,174 @@ dot_product(const double *u, const double *v, npy_intp n)
 }
 
 static NPY_INLINE double
+mahalanobis_distance(const double *u, const double *v, const double *covinv,
+                     double *dimbuf1, double *dimbuf2, npy_intp n)
+{
+    npy_intp i;
+
+    for (i = 0; i < n; i++) {
+        dimbuf1[i] = u[i] - v[i];
+    }
+    /*
+     * Note: matrix-vector multiplication (GEMV). Again, OpenBLAS can speed
+     * this up for high-d data.
+     */
+    for (i = 0; i < n; i++) {
+        const double *covrow = covinv + (i * n);
+        dimbuf2[i] = dot_product(dimbuf1, covrow, n);
+    }
+    return sqrt(dot_product(dimbuf1, dimbuf2, n));
+}
+
+static NPY_INLINE double
+hamming_distance_double(const double *u, const double *v, npy_intp n)
+{
+    npy_intp i, s = 0;
+
+    for (i = 0; i < n; i++) {
+        s += (u[i] != v[i]);
+    }
+    return (double)s / n;
+}
+
+static NPY_INLINE double
+hamming_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i, s = 0;
+
+    for (i = 0; i < n; i++) {
+        s += (u[i] != v[i]);
+    }
+    return (double)s / n;
+}
+
+static NPY_INLINE double
+yule_bool_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, nff = 0, nft = 0, ntf = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ntf += x & (!y);
+        nft += (!x) & y;
+    }
+    nff = n - ntt - ntf - nft;
+    return (2. * ntf * nft) / ((double)ntt * nff + (double)ntf * nft);
+}
+
+static NPY_INLINE double
+dice_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, ndiff = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ndiff += (x != y);
+    }
+    return ndiff / (2. * ntt + ndiff);
+}
+
+static NPY_INLINE double
+rogerstanimoto_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, ndiff = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ndiff += (x != y);
+    }
+    return (2. * ndiff) / ((double)n + ndiff);
+}
+
+static NPY_INLINE double
+russellrao_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0;
+
+    for (i = 0; i < n; i++) {
+        ntt += (u[i] != 0) & (v[i] != 0);
+    }
+    return (double)(n - ntt) / n;
+}
+
+static NPY_INLINE double
+kulsinski_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, ndiff = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ndiff += (x != y);
+    }
+    return ((double)ndiff - ntt + n) / ((double)ndiff + n);
+}
+
+static NPY_INLINE double
+sokalsneath_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, ndiff = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ndiff += (x != y);
+    }
+    return (2. * ndiff) / (2. * ndiff + ntt);
+}
+
+static NPY_INLINE double
+sokalmichener_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp i;
+    npy_intp ntt = 0, ndiff = 0;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        ntt += x & y;
+        ndiff += (x != y);
+    }
+    return (2. * ndiff) / ((double)ndiff + n);
+}
+
+static NPY_INLINE double
+jaccard_distance_double(const double *u, const double *v, npy_intp n)
+{
+    npy_intp denom = 0, num = 0;
+    npy_intp i;
+
+    for (i = 0; i < n; i++) {
+        double x = u[i], y = v[i];
+        num += (x != y) & ((x != 0.0) | (y != 0.0));
+        denom += (x != 0.0) | (y != 0.0);
+    }
+    return (double)num / denom;
+}
+
+static NPY_INLINE double
+jaccard_distance_char(const char *u, const char *v, npy_intp n)
+{
+    npy_intp num = 0, denom = 0;
+    npy_intp i;
+
+    for (i = 0; i < n; i++) {
+        npy_bool x = (u[i] != 0), y = (v[i] != 0);
+        num += (x != y);
+        denom += x | y;
+    }
+    return (double)num / denom;
+}
+
+static NPY_INLINE double
 seuclidean_distance(const double *var, const double *u, const double *v,
                     npy_intp n)
 {
@@ -322,7 +305,7 @@ seuclidean_distance(const double *var, const double *u, const double *v,
 
     for (i = 0; i < n; i++) {
         d = u[i] - v[i];
-        s = s + (d * d) / var[i];
+        s += (d * d) / var[i];
     }
     return sqrt(s);
 }
@@ -330,12 +313,11 @@ seuclidean_distance(const double *var, const double *u, const double *v,
 static NPY_INLINE double
 city_block_distance_double(const double *u, const double *v, npy_intp n)
 {
-    double s = 0.0, d;
+    double s = 0.0;
     npy_intp i;
 
     for (i = 0; i < n; i++) {
-        d = fabs(u[i] - v[i]);
-        s = s + d;
+        s += fabs(u[i] - v[i]);
     }
     return s;
 }
@@ -348,7 +330,7 @@ minkowski_distance(const double *u, const double *v, npy_intp n, double p)
 
     for (i = 0; i < n; i++) {
         d = fabs(u[i] - v[i]);
-        s = s + pow(d, p);
+        s += pow(d, p);
     }
     return pow(s, 1.0 / p);
 }
@@ -357,13 +339,13 @@ static NPY_INLINE double
 weighted_minkowski_distance(const double *u, const double *v, npy_intp n,
                             double p, const double *w)
 {
-  npy_intp i = 0;
-  double s = 0.0, d;
-  for (i = 0; i < n; i++) {
-    d = fabs(u[i] - v[i]) * w[i];
-    s = s + pow(d, p);
-  }
-  return pow(s, 1.0 / p);
+    npy_intp i = 0;
+    double s = 0.0, d;
+    for (i = 0; i < n; i++) {
+        d = fabs(u[i] - v[i]) * w[i];
+        s += pow(d, p);
+    }
+    return pow(s, 1.0 / p);
 }
 
 #if 0   /* XXX unused */
@@ -405,7 +387,6 @@ pdist_mahalanobis(const double *X, const double *covinv, double *dimbuf,
             *dm = mahalanobis_distance(u, v, covinv, dimbuf1, dimbuf2, n);
         }
     }
-    dimbuf2 = 0;
 }
 
 static NPY_INLINE void
@@ -413,13 +394,19 @@ pdist_cosine(const double *X, double *dm, npy_intp m, npy_intp n,
              const double *norms)
 {
     const double *u, *v;
+    double cosine;
     npy_intp i, j;
 
     for (i = 0; i < m; i++) {
         for (j = i + 1; j < m; j++, dm++) {
             u = X + (n * i);
             v = X + (n * j);
-            *dm = 1. - dot_product(u, v, n) / (norms[i] * norms[j]);
+            cosine = dot_product(u, v, n) / (norms[i] * norms[j]);
+            if (fabs(cosine) > 1.) {
+                /* Clip to correct rounding error. */
+                cosine = npy_copysign(1, cosine);
+            }
+            *dm = 1. - cosine;
         }
     }
 }
@@ -472,32 +459,54 @@ pdist_weighted_minkowski(const double *X, double *dm, npy_intp m, npy_intp n,
 }
 
 static NPY_INLINE void
-dist_to_squareform_from_vector(double *M, const double *v, npy_intp n)
+dist_to_squareform_from_vector_generic(char *M, const char *v, npy_intp n,
+                                       npy_intp s)
 {
-    double *it, *it2;
+    char *it1 = M + s;
+    char *it2;
     npy_intp i, j;
 
-    for (i = 0; i < n - 1; i++) {
-        it  = M + (i * n) + i + 1;
-        it2 = M + (i+1)*n + i;
-        for (j = i + 1; j < n; j++, it++, it2 += n, v++) {
-            *it = *v;
+    for (i = 1; i < n; i++) {
+        memcpy(it1, v, (n - i) * s);
+        it1 += (n + 1) * s;
+
+        it2 = M + i * (n + 1) * s - s;
+        for (j = i; j < n; j++) {
+            memcpy(it2, v, s);
+            v += s;
+            it2 += n*s;
+        }
+    }
+}
+
+static NPY_INLINE void
+dist_to_squareform_from_vector_double(double *M, const double *v, npy_intp n)
+{
+    double *it1 = M + 1;
+    double *it2;
+    npy_intp i, j;
+
+    for (i = 1; i < n; i++, it1 += n+1) {
+        memcpy(it1, v, (n - i) * sizeof(double));
+
+        it2 = M + i * (n + 1) - 1;
+        for (j = i; j < n; j++, v++, it2 += n) {
             *it2 = *v;
         }
     }
 }
 
 static NPY_INLINE void
-dist_to_vector_from_squareform(const double *M, double *v, npy_intp n)
+dist_to_vector_from_squareform(const char *M, char *v, npy_intp n, npy_intp s)
 {
-    const double *cit;
-    npy_intp i, j;
+    const char *cit = M + s;
+    npy_intp i, len;
 
-    for (i = 0; i < n - 1; i++) {
-        cit = M + (i * n) + i + 1;
-        for (j = i + 1; j < n; j++, v++, cit++) {
-            *v = *cit;
-        }
+    for (i = 1; i < n; i++) {
+        len = (n - i) * s;
+        memcpy(v, cit, len);
+        v += len;
+        cit += (n + 1) * s;
     }
 }
 
@@ -522,7 +531,6 @@ cdist_mahalanobis(const double *XA, const double *XB,
             *dm = mahalanobis_distance(u, v, covinv, dimbuf1, dimbuf2, n);
         }
     }
-    dimbuf2 = 0;
 }
 
 static NPY_INLINE void
@@ -604,7 +612,6 @@ DEFINE_CDIST(dice, char)
 DEFINE_CDIST(hamming, char)
 DEFINE_CDIST(jaccard, char)
 DEFINE_CDIST(kulsinski, char)
-DEFINE_CDIST(matching, char)
 DEFINE_CDIST(rogerstanimoto, char)
 DEFINE_CDIST(russellrao, char)
 DEFINE_CDIST(sokalmichener, char)
@@ -641,7 +648,6 @@ DEFINE_PDIST(dice, char)
 DEFINE_PDIST(hamming, char)
 DEFINE_PDIST(jaccard, char)
 DEFINE_PDIST(kulsinski, char)
-DEFINE_PDIST(matching, char)
 DEFINE_PDIST(rogerstanimoto, char)
 DEFINE_PDIST(russellrao, char)
 DEFINE_PDIST(sokalmichener, char)

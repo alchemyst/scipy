@@ -32,10 +32,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if !defined(__clang__) && defined(__GNUC__) && defined(__GNUC_MINOR__)
+#if __GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+/* enable auto-vectorizer */
+#pragma GCC optimize("tree-vectorize")
+/* float associativity required to vectorize reductions */
+#pragma GCC optimize("unsafe-math-optimizations")
+/* maybe 5% gain, manual unrolling with more accumulators would be better */
+#pragma GCC optimize("unroll-loops")
+#endif
+#endif
+
 #include <math.h>
 #include <stdlib.h>
 #include <Python.h>
 #include <numpy/arrayobject.h>
+#include <numpy/npy_math.h>
 
 #include "distance_impl.h"
 
@@ -254,31 +266,6 @@ static PyObject *cdist_weighted_minkowski_wrap(PyObject *self, PyObject *args) {
     NPY_END_ALLOW_THREADS;
   }
   return Py_BuildValue("d", 0.0);
-}
-
-static PyObject *cdist_matching_bool_wrap(PyObject *self, PyObject *args) {
-  PyArrayObject *XA_, *XB_, *dm_;
-  int mA, mB, n;
-  double *dm;
-  const char *XA, *XB;
-  if (!PyArg_ParseTuple(args, "O!O!O!",
-			&PyArray_Type, &XA_, &PyArray_Type, &XB_, 
-			&PyArray_Type, &dm_)) {
-    return 0;
-  }
-  else {
-    NPY_BEGIN_ALLOW_THREADS;
-    XA = (const char*)XA_->data;
-    XB = (const char*)XB_->data;
-    dm = (double*)dm_->data;
-    mA = XA_->dimensions[0];
-    mB = XB_->dimensions[0];
-    n = XA_->dimensions[1];
-
-    cdist_matching_char(XA, XB, dm, mA, mB, n);
-    NPY_END_ALLOW_THREADS;
-  }
-  return Py_BuildValue("");
 }
 
 static PyObject *cdist_dice_bool_wrap(PyObject *self, PyObject *args) {
@@ -672,29 +659,6 @@ static PyObject *pdist_yule_bool_wrap(PyObject *self, PyObject *args) {
   return Py_BuildValue("");
 }
 
-static PyObject *pdist_matching_bool_wrap(PyObject *self, PyObject *args) {
-  PyArrayObject *X_, *dm_;
-  int m, n;
-  double *dm;
-  const char *X;
-  if (!PyArg_ParseTuple(args, "O!O!",
-			&PyArray_Type, &X_,
-			&PyArray_Type, &dm_)) {
-    return 0;
-  }
-  else {
-    NPY_BEGIN_ALLOW_THREADS;
-    X = (const char*)X_->data;
-    dm = (double*)dm_->data;
-    m = X_->dimensions[0];
-    n = X_->dimensions[1];
-
-    pdist_matching_char(X, dm, m, n);
-    NPY_END_ALLOW_THREADS;
-  }
-  return Py_BuildValue("");
-}
-
 static PyObject *pdist_dice_bool_wrap(PyObject *self, PyObject *args) {
   PyArrayObject *X_, *dm_;
   int m, n;
@@ -835,30 +799,31 @@ static PyObject *pdist_sokalsneath_bool_wrap(PyObject *self, PyObject *args) {
 
 static PyObject *to_squareform_from_vector_wrap(PyObject *self, PyObject *args) {
   PyArrayObject *M_, *v_;
-  int n;
-  const double *v;
-  double *M;
+  int n, elsize;
   if (!PyArg_ParseTuple(args, "O!O!",
 			&PyArray_Type, &M_,
 			&PyArray_Type, &v_)) {
     return 0;
   }
-  else {
-    NPY_BEGIN_ALLOW_THREADS;
-    M = (double*)M_->data;
-    v = (const double*)v_->data;
-    n = M_->dimensions[0];
-    dist_to_squareform_from_vector(M, v, n);
-    NPY_END_ALLOW_THREADS;
+  NPY_BEGIN_ALLOW_THREADS;
+  n = M_->dimensions[0];
+  elsize = M_->descr->elsize;
+  if (elsize == 8) {
+    dist_to_squareform_from_vector_double(
+        (double*)M_->data, (const double*)v_->data, n);
+  } else {
+    dist_to_squareform_from_vector_generic(
+        (char*)M_->data, (const char*)v_->data, n, elsize);
   }
-  return Py_BuildValue("d", 0.0);
+  NPY_END_ALLOW_THREADS;
+  return Py_BuildValue("");
 }
 
 static PyObject *to_vector_from_squareform_wrap(PyObject *self, PyObject *args) {
   PyArrayObject *M_, *v_;
-  int n;
-  double *v;
-  const double *M;
+  int n, s;
+  char *v;
+  const char *M;
   if (!PyArg_ParseTuple(args, "O!O!",
 			&PyArray_Type, &M_,
 			&PyArray_Type, &v_)) {
@@ -866,13 +831,14 @@ static PyObject *to_vector_from_squareform_wrap(PyObject *self, PyObject *args) 
   }
   else {
     NPY_BEGIN_ALLOW_THREADS;
-    M = (const double*)M_->data;
-    v = (double*)v_->data;
+    M = (const char*)M_->data;
+    v = (char*)v_->data;
     n = M_->dimensions[0];
-    dist_to_vector_from_squareform(M, v, n);
+    s = M_->descr->elsize;
+    dist_to_vector_from_squareform(M, v, n, s);
     NPY_END_ALLOW_THREADS;
   }
-  return Py_BuildValue("d", 0.0);
+  return Py_BuildValue("");
 }
 
 
@@ -890,7 +856,6 @@ static PyMethodDef _distanceWrapMethods[] = {
   {"cdist_jaccard_bool_wrap", cdist_jaccard_bool_wrap, METH_VARARGS},
   {"cdist_kulsinski_bool_wrap", cdist_kulsinski_bool_wrap, METH_VARARGS},
   {"cdist_mahalanobis_wrap", cdist_mahalanobis_wrap, METH_VARARGS},
-  {"cdist_matching_bool_wrap", cdist_matching_bool_wrap, METH_VARARGS},
   {"cdist_minkowski_wrap", cdist_minkowski_wrap, METH_VARARGS},
   {"cdist_weighted_minkowski_wrap", cdist_weighted_minkowski_wrap, METH_VARARGS},
   {"cdist_rogerstanimoto_bool_wrap", cdist_rogerstanimoto_bool_wrap, METH_VARARGS},
@@ -913,7 +878,6 @@ static PyMethodDef _distanceWrapMethods[] = {
   {"pdist_jaccard_bool_wrap", pdist_jaccard_bool_wrap, METH_VARARGS},
   {"pdist_kulsinski_bool_wrap", pdist_kulsinski_bool_wrap, METH_VARARGS},
   {"pdist_mahalanobis_wrap", pdist_mahalanobis_wrap, METH_VARARGS},
-  {"pdist_matching_bool_wrap", pdist_matching_bool_wrap, METH_VARARGS},
   {"pdist_minkowski_wrap", pdist_minkowski_wrap, METH_VARARGS},
   {"pdist_weighted_minkowski_wrap", pdist_weighted_minkowski_wrap, METH_VARARGS},
   {"pdist_rogerstanimoto_bool_wrap", pdist_rogerstanimoto_bool_wrap, METH_VARARGS},

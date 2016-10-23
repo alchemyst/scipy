@@ -7,7 +7,7 @@ from ._ufuncs import _ellip_harm
 from ._ellip_harm_2 import _ellipsoid, _ellipsoid_norm
 
 
-# the functions _ellipsoid, _ellipsoid_norm use global variables, the lock  
+# the functions _ellipsoid, _ellipsoid_norm use global variables, the lock
 # protects them if the function is called from multiple threads simultaneously
 _ellip_lock = threading.Lock()
 
@@ -56,26 +56,28 @@ def ellip_harm(h2, k2, n, p, s, signm=1, signn=1):
     explained in [2]_, [3]_, [4]_.  The `signm` and `signn` arguments control the
     sign of prefactors for functions according to their type::
 
-        K : +1 
+        K : +1
         L : signm
         M : signn
         N : signm*signn
+
+    .. versionadded:: 0.15.0
 
     References
     ----------
     .. [1] Digital Libary of Mathematical Functions 29.12
        http://dlmf.nist.gov/29.12
-    .. [2] Bardhan and Knepley, "Computational science and 
-       re-discovery: open-source implementations of 
+    .. [2] Bardhan and Knepley, "Computational science and
+       re-discovery: open-source implementations of
        ellipsoidal harmonics for problems in potential theory",
        Comput. Sci. Disc. 5, 014006 (2012)
-       doi:10.1088/1749-4699/5/1/014006
+       :doi:`10.1088/1749-4699/5/1/014006`.
     .. [3] David J.and Dechambre P, "Computation of Ellipsoidal
        Gravity Field Harmonics for small solar system bodies"
        pp. 30-36, 2000
     .. [4] George Dassios, "Ellipsoidal Harmonics: Theory and Applications"
        pp. 418, 2012
-    
+
     Examples
     --------
     >>> from scipy.special import ellip_harm
@@ -101,11 +103,7 @@ def ellip_harm(h2, k2, n, p, s, signm=1, signn=1):
     return _ellip_harm(h2, k2, n, p, s, signm, signn)
 
 
-# np.vectorize does not work on Cython functions on Numpy < 1.8, so a wrapper is needed
-def _ellip_harm_2_vec(h2, k2, n, p, s):
-    return _ellipsoid(h2, k2, n, p, s)
-
-_ellip_harm_2_vec = np.vectorize(_ellip_harm_2_vec, otypes='d')
+_ellip_harm_2_vec = np.vectorize(_ellipsoid, otypes='d')
 
 
 def ellip_harm_2(h2, k2, n, p, s):
@@ -146,6 +144,8 @@ def ellip_harm_2(h2, k2, n, p, s):
 
        F^p_n(s)=(2n + 1)E^p_n(s)\int_{0}^{1/s}\frac{du}{(E^p_n(1/u))^2\sqrt{(1-u^2k^2)(1-u^2h^2)}}
 
+    .. versionadded:: 0.15.0
+
     See Also
     --------
     ellip_harm, ellip_normal
@@ -175,7 +175,7 @@ def ellip_normal(h2, k2, n, p):
 
     The normalization constant is defined as
 
-    .. math:: 
+    .. math::
 
        \gamma^p_n=8\int_{0}^{h}dx\int_{h}^{k}dy\frac{(y^2-x^2)(E^p_n(y)E^p_n(x))^2}{\sqrt((k^2-y^2)(y^2-h^2)(h^2-x^2)(k^2-x^2)}
 
@@ -185,9 +185,9 @@ def ellip_normal(h2, k2, n, p):
         ``h**2``
     k2 : float
         ``k**2``; should be larger than ``h**2``
-    n: int
+    n : int
         Degree.
-    p: int
+    p : int
         Order, can range between [1,2n+1].
 
     Returns
@@ -198,6 +198,10 @@ def ellip_normal(h2, k2, n, p):
     See Also
     --------
     ellip_harm, ellip_harm_2
+
+    Notes
+    -----
+    .. versionadded:: 0.15.0
 
     Examples
     --------

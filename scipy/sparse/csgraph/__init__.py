@@ -25,6 +25,20 @@ Contents
    breadth_first_tree -- construct the breadth-first tree from a given node
    depth_first_tree -- construct a depth-first tree from a given node
    minimum_spanning_tree -- construct the minimum spanning tree of a graph
+   reverse_cuthill_mckee -- compute permutation for reverse Cuthill-McKee ordering
+   maximum_bipartite_matching -- compute permutation to make diagonal zero free
+   NegativeCycleError
+
+.. autosummary::
+   :toctree: generated/
+
+   construct_dist_matrix
+   csgraph_from_dense
+   csgraph_from_masked
+   csgraph_masked_from_dense
+   csgraph_to_dense
+   csgraph_to_masked
+   reconstruct_path
 
 Graph Representations
 =====================
@@ -139,8 +153,9 @@ __all__ = ['cs_graph_components',
            'maximum_bipartite_matching',
            'construct_dist_matrix',
            'reconstruct_path',
-           'csgraph_from_dense',
            'csgraph_masked_from_dense',
+           'csgraph_from_dense',
+           'csgraph_from_masked',
            'csgraph_to_dense',
            'csgraph_to_masked',
            'NegativeCycleError']
@@ -155,7 +170,7 @@ from ._min_spanning_tree import minimum_spanning_tree
 from ._reordering import reverse_cuthill_mckee, maximum_bipartite_matching
 from ._tools import construct_dist_matrix, reconstruct_path,\
     csgraph_from_dense, csgraph_to_dense, csgraph_masked_from_dense,\
-    csgraph_from_masked
+    csgraph_from_masked, csgraph_to_masked
 
 from numpy import deprecate as _deprecate
 cs_graph_components = _deprecate(cs_graph_components,

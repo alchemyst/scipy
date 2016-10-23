@@ -44,7 +44,7 @@ def connected_components(csgraph, directed=True, connection='weak',
         from i to j and from j to i.  Nodes i and j are weakly connected if
         only one of these paths exists.  If directed == False, this keyword
         is not referenced.
-    return_labels : str, optional
+    return_labels : bool, optional
         If True (default), then return the labels for each of the connected
         components.
 
@@ -236,8 +236,8 @@ def depth_first_tree(csgraph, i_start, directed=True):
     return reconstruct_path(csgraph, predecessors, directed)
 
 
-def breadth_first_order(csgraph, i_start,
-                        directed=True, return_predecessors=True):
+cpdef breadth_first_order(csgraph, i_start,
+                          directed=True, return_predecessors=True):
     """
     breadth_first_order(csgraph, i_start, directed=True, return_predecessors=True)
 
@@ -277,7 +277,6 @@ def breadth_first_order(csgraph, i_start,
         predecessors[i]. If node i is not in the tree (and for the parent
         node) then predecessors[i] = -9999.
     """
-    global NULL_IDX
     csgraph = validate_graph(csgraph, directed, dense_output=False)
     cdef int N = csgraph.shape[0]
 
@@ -318,8 +317,6 @@ cdef unsigned int _breadth_first_directed(
     #                tree.  Should be initialized to NULL_IDX
     # Returns:
     #  n_nodes: the number of nodes in the breadth-first tree
-    global NULL_IDX
-
     cdef unsigned int i, pnode, cnode
     cdef unsigned int i_nl, i_nl_end
     cdef unsigned int N = node_list.shape[0]
@@ -331,7 +328,7 @@ cdef unsigned int _breadth_first_directed(
     while i_nl < i_nl_end:
         pnode = node_list[i_nl]
 
-        for i from indptr[pnode] <= i < indptr[pnode + 1]:
+        for i in range(indptr[pnode], indptr[pnode + 1]):
             cnode = indices[i]
             if (cnode == head_node):
                 continue
@@ -364,8 +361,6 @@ cdef unsigned int _breadth_first_undirected(
     #                tree.  Should be initialized to NULL_IDX
     # Returns:
     #  n_nodes: the number of nodes in the breadth-first tree
-    global NULL_IDX
-
     cdef unsigned int i, pnode, cnode
     cdef unsigned int i_nl, i_nl_end
     cdef unsigned int N = node_list.shape[0]
@@ -377,7 +372,7 @@ cdef unsigned int _breadth_first_undirected(
     while i_nl < i_nl_end:
         pnode = node_list[i_nl]
 
-        for i from indptr1[pnode] <= i < indptr1[pnode + 1]:
+        for i in range(indptr1[pnode], indptr1[pnode + 1]):
             cnode = indices1[i]
             if (cnode == head_node):
                 continue
@@ -386,7 +381,7 @@ cdef unsigned int _breadth_first_undirected(
                 predecessors[cnode] = pnode
                 i_nl_end += 1
 
-        for i from indptr2[pnode] <= i < indptr2[pnode + 1]:
+        for i in range(indptr2[pnode], indptr2[pnode + 1]):
             cnode = indices2[i]
             if (cnode == head_node):
                 continue
@@ -400,8 +395,8 @@ cdef unsigned int _breadth_first_undirected(
     return i_nl
 
 
-def depth_first_order(csgraph, i_start,
-                      directed=True, return_predecessors=True):
+cpdef depth_first_order(csgraph, i_start,
+                        directed=True, return_predecessors=True):
     """
     depth_first_order(csgraph, i_start, directed=True, return_predecessors=True)
 
@@ -442,7 +437,6 @@ def depth_first_order(csgraph, i_start,
         predecessors[i]. If node i is not in the tree (and for the parent
         node) then predecessors[i] = -9999.
     """
-    global NULL_IDX
     csgraph = validate_graph(csgraph, directed, dense_output=False)
     cdef int N = csgraph.shape[0]
 
@@ -494,7 +488,7 @@ cdef unsigned int _depth_first_directed(
     while i_root >= 0:
         pnode = root_list[i_root]
         no_children = True
-        for i from indptr[pnode] <= i < indptr[pnode + 1]:
+        for i in range(indptr[pnode], indptr[pnode + 1]):
             cnode = indices[i]
             if flag[cnode]:
                 continue
@@ -541,7 +535,7 @@ cdef unsigned int _depth_first_undirected(
         pnode = root_list[i_root]
         no_children = True
 
-        for i from indptr1[pnode] <= i < indptr1[pnode + 1]:
+        for i in range(indptr1[pnode], indptr1[pnode + 1]):
             cnode = indices1[i]
             if flag[cnode]:
                 continue
@@ -556,7 +550,7 @@ cdef unsigned int _depth_first_undirected(
                 break
 
         if no_children:
-            for i from indptr2[pnode] <= i < indptr2[pnode + 1]:
+            for i in range(indptr2[pnode], indptr2[pnode + 1]):
                 cnode = indices2[i]
                 if flag[cnode]:
                     continue
@@ -600,8 +594,8 @@ cdef int _connected_components_directed(
     """
     cdef int v, w, index, low_v, low_w, label, j
     cdef int SS_head, root, stack_head, f, b
-    cdef int VOID = -1
-    cdef int END = -2
+    DEF VOID = -1
+    DEF END = -2
     cdef int N = labels.shape[0]
     cdef np.ndarray[ITYPE_t, ndim=1, mode="c"] SS, lowlinks, stack_f, stack_b
 
@@ -642,23 +636,25 @@ cdef int _connected_components_directed(
                     index += 1
 
                     # Add successor nodes
-                    for j from indptr[v] <= j < indptr[v+1]:
+                    for j in range(indptr[v], indptr[v+1]):
                         w = indices[j]
                         if lowlinks[w] == VOID:
-                            # DFS-stack push
-                            if stack_f[w] != VOID:
-                                # w is already inside the stack, so excise it.
-                                f = stack_f[w]
-                                b = stack_b[w]
-                                if b != END:
-                                    stack_f[b] = f
-                                if f != END:
-                                    stack_b[f] = b
+                            with cython.boundscheck(False):
+                                # DFS-stack push
+                                if stack_f[w] != VOID:
+                                    # w is already inside the stack,
+                                    # so excise it.
+                                    f = stack_f[w]
+                                    b = stack_b[w]
+                                    if b != END:
+                                        stack_f[b] = f
+                                    if f != END:
+                                        stack_b[f] = b
 
-                            stack_f[w] = stack_head
-                            stack_b[w] = END
-                            stack_b[stack_head] = w
-                            stack_head = w
+                                stack_f[w] = stack_head
+                                stack_b[w] = END
+                                stack_b[stack_head] = w
+                                stack_head = w
 
                 else:
                     # DFS-stack pop
@@ -670,7 +666,7 @@ cdef int _connected_components_directed(
 
                     root = 1 # True
                     low_v = lowlinks[v]
-                    for j from indptr[v] <= j < indptr[v+1]:
+                    for j in range(indptr[v], indptr[v+1]):
                         low_w = lowlinks[indices[j]]
                         if low_w < low_v:
                             low_v = low_w
@@ -708,8 +704,8 @@ cdef int _connected_components_undirected(
 
     cdef int v, w, j, label, SS_head
     cdef int N = labels.shape[0]
-    cdef int VOID = -1
-    cdef int END = -2
+    DEF VOID = -1
+    DEF END = -2
     labels.fill(VOID)
     label = 0
 
@@ -732,12 +728,12 @@ cdef int _connected_components_undirected(
 
                 # Push children onto the stack if they havn't been
                 # seen at all yet.
-                for j from indptr1[v] <= j < indptr1[v+1]:
+                for j in range(indptr1[v], indptr1[v+1]):
                     w = indices1[j]
                     if SS[w] == VOID:
                         SS[w] = SS_head
                         SS_head = w
-                for j from indptr2[v] <= j < indptr2[v+1]:
+                for j in range(indptr2[v], indptr2[v+1]):
                     w = indices2[j]
                     if SS[w] == VOID:
                         SS[w] = SS_head

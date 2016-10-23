@@ -34,12 +34,22 @@ class TestCtypesQuad(TestCase):
     @dec.skipif(_ctypes_missing, msg="Ctypes library could not be found")
     def setUp(self):
         if sys.platform == 'win32':
-            file = ctypes.util.find_msvcrt()
+            if sys.version_info < (3, 5):
+                file = ctypes.util.find_msvcrt()
+            else:
+                file = 'api-ms-win-crt-math-l1-1-0.dll'
         elif sys.platform == 'darwin':
             file = 'libm.dylib'
         else:
             file = 'libm.so'
-        self.lib = ctypes.CDLL(file)
+
+        try:
+            self.lib = ctypes.CDLL(file)
+        except OSError:
+            # This test doesn't work on some Linux platforms (Fedora for
+            # example) that put an ld script in libm.so - see gh-5370
+            self.skipTest("Ctypes can't import libm.so")
+
         restype = ctypes.c_double
         argtypes = (ctypes.c_double,)
         for name in ['sin', 'cos', 'tan']:
@@ -140,9 +150,9 @@ class TestQuad(TestCase):
     def test_singular(self):
         # 3) Singular points in region of integration.
         def myfunc(x):
-            if x > 0 and x < 2.5:
+            if 0 < x < 2.5:
                 return sin(x)
-            elif x >= 2.5 and x <= 5.0:
+            elif 2.5 <= x <= 5.0:
                 return exp(-x)
             else:
                 return 0.0
@@ -212,16 +222,25 @@ class TestQuad(TestCase):
         assert_quad(dblquad(simpfunc, a, b, lambda x: x, lambda x: 2*x),
                     5/6.0 * (b**3.0-a**3.0))
 
+    def test_double_integral2(self):
+        def func(x0, x1, t0, t1):
+            return x0 + x1 + t0 + t1
+        g = lambda x: x
+        h = lambda x: 2 * x
+        args = 1, 2
+        assert_quad(dblquad(func, 1, 2, g, h, args=args),35./6 + 9*.5)
+
     def test_triple_integral(self):
         # 9) Triple Integral test
-        def simpfunc(z, y, x):      # Note order of arguments.
-            return x+y+z
+        def simpfunc(z, y, x, t):      # Note order of arguments.
+            return (x+y+z)*t
 
         a, b = 1.0, 2.0
         assert_quad(tplquad(simpfunc, a, b,
                             lambda x: x, lambda x: 2*x,
-                            lambda x, y: x - y, lambda x, y: x + y),
-                    8/3.0 * (b**4.0 - a**4.0))
+                            lambda x, y: x - y, lambda x, y: x + y,
+                            (2.,)),
+                     2*8/3.0 * (b**4.0 - a**4.0))
 
 
 class TestNQuad(TestCase):
@@ -235,9 +254,10 @@ class TestNQuad(TestCase):
             return {'points': [0.2*args[2] + 0.5 + 0.25*args[0]]}
 
         res = nquad(func1, [[0, 1], [-1, 1], [.13, .8], [-.15, 1]],
-                    opts=[opts_basic, {}, {}, {}])
-        assert_quad(res, 1.5267454070738635)
-
+                    opts=[opts_basic, {}, {}, {}], full_output=True)
+        assert_quad(res[:-1], 1.5267454070738635)
+        assert_(res[-1]['neval'] > 0 and res[-1]['neval'] < 4e5) 
+        
     def test_variable_limits(self):
         scale = .1
 
@@ -352,6 +372,12 @@ class TestNQuad(TestCase):
                       args=(2, 3))
         res2 = nquad(func3d, [[-np.pi, np.pi], [-2, 2], (-1, 2)], args=(2, 3))
         assert_almost_equal(res, res2)
+
+    def test_dict_as_opts(self):
+        try:
+            out = nquad(lambda x, y: x * y, [[0, 1], [0, 1]], opts={'epsrel': 0.0001})
+        except(TypeError):
+            assert False
 
 
 if __name__ == "__main__":

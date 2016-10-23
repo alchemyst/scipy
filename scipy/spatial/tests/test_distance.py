@@ -255,9 +255,7 @@ class TestCdist(TestCase):
 
         # Naive implementation
         def norms(X):
-            # NumPy 1.7: np.linalg.norm(X, axis=1).reshape(-1, 1)
-            return np.asarray([np.linalg.norm(row)
-                               for row in X]).reshape(-1, 1)
+            return np.linalg.norm(X, axis=1).reshape(-1, 1)
 
         Y2 = 1 - np.dot((X1 / norms(X1)), (X2 / norms(X2)).T)
 
@@ -278,6 +276,24 @@ class TestCdist(TestCase):
         Y1 = cdist(X1, X2, 'mahalanobis')
         Y2 = cdist(X1, X2, 'test_mahalanobis')
         _assert_within_tol(Y1, Y2, eps, verbose > 2)
+
+    def test_cdist_mahalanobis(self):
+        # 1-dimensional observations
+        x1 = np.array([[2], [3]])
+        x2 = np.array([[2], [5]])
+        dist = cdist(x1, x2, metric='mahalanobis')
+        assert_allclose(dist, [[0.0, np.sqrt(4.5)], [np.sqrt(0.5), np.sqrt(2)]])
+
+        # 2-dimensional observations
+        x1 = np.array([[0, 0], [-1, 0]])
+        x2 = np.array([[0, 2], [1, 0], [0, -2]])
+        dist = cdist(x1, x2, metric='mahalanobis')
+        rt2 = np.sqrt(2)
+        assert_allclose(dist, [[rt2, rt2, rt2], [2, 2*rt2, 2]])
+
+        # Too few observations
+        assert_raises(ValueError,
+                      cdist, [[0, 1]], [[2, 3]], metric='mahalanobis')
 
     def test_cdist_canberra_random(self):
         eps = 1e-07
@@ -505,6 +521,15 @@ class TestPdist(TestCase):
         Y_test2 = pdist(X, 'test_cosine')
         _assert_within_tol(Y_test2, Y_right, eps)
 
+    def test_pdist_cosine_bounds(self):
+        # Test adapted from @joernhees's example at gh-5208: case were
+        # cosine distance used to be negative. XXX: very sensitive to the
+        # specific norm computation.
+        x = np.abs(np.random.RandomState(1337).rand(91))
+        X = np.vstack([x, x])
+        assert_(pdist(X, 'cosine')[0] >= 0,
+                msg='cosine distance should be non-negative')
+
     def test_pdist_cityblock_random(self):
         eps = 1e-06
         X = eo['pdist-double-inp']
@@ -688,6 +713,23 @@ class TestPdist(TestCase):
         dist2 = pdist(x, metric='wminkowski', w=[0., 1., 2.], p=1)
         assert_allclose(dist1, dist2, rtol=1e-14)
 
+    def test_pdist_mahalanobis(self):
+        # 1-dimensional observations
+        x = np.array([2.0, 2.0, 3.0, 5.0]).reshape(-1, 1)
+        dist = pdist(x, metric='mahalanobis')
+        assert_allclose(dist, [0.0, np.sqrt(0.5), np.sqrt(4.5),
+                               np.sqrt(0.5), np.sqrt(4.5), np.sqrt(2.0)])
+
+        # 2-dimensional observations
+        x = np.array([[0, 0], [-1, 0], [0, 2], [1, 0], [0, -2]])
+        dist = pdist(x, metric='mahalanobis')
+        rt2 = np.sqrt(2)
+        assert_allclose(dist, [rt2, rt2, rt2, rt2, 2, 2*rt2, 2, 2, 2*rt2, 2])
+
+        # Too few observations
+        assert_raises(ValueError,
+                      pdist, [[0, 1], [2, 3]], metric='mahalanobis')
+
     def test_pdist_hamming_random(self):
         eps = 1e-07
         X = eo['pdist-boolean-inp']
@@ -818,8 +860,8 @@ class TestPdist(TestCase):
         # Test matching(*,*) with mtica example #1 (nums).
         m = matching(np.array([1, 0, 1, 1, 0]),
                      np.array([1, 1, 0, 1, 1]))
-        m2 = matching(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                      np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = matching(np.array([1, 0, 1, 1, 0], dtype=bool),
+                      np.array([1, 1, 0, 1, 1], dtype=bool))
         assert_allclose(m, 0.6, rtol=0, atol=1e-10)
         assert_allclose(m2, 0.6, rtol=0, atol=1e-10)
 
@@ -827,8 +869,8 @@ class TestPdist(TestCase):
         # Test matching(*,*) with mtica example #2.
         m = matching(np.array([1, 0, 1]),
                      np.array([1, 1, 0]))
-        m2 = matching(np.array([1, 0, 1], dtype=np.bool),
-                      np.array([1, 1, 0], dtype=np.bool))
+        m2 = matching(np.array([1, 0, 1], dtype=bool),
+                      np.array([1, 1, 0], dtype=bool))
         assert_allclose(m, 2/3, rtol=0, atol=1e-10)
         assert_allclose(m2, 2/3, rtol=0, atol=1e-10)
 
@@ -852,16 +894,16 @@ class TestPdist(TestCase):
     def test_pdist_jaccard_mtica1(self):
         m = jaccard(np.array([1, 0, 1, 1, 0]),
                     np.array([1, 1, 0, 1, 1]))
-        m2 = jaccard(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                     np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = jaccard(np.array([1, 0, 1, 1, 0], dtype=bool),
+                     np.array([1, 1, 0, 1, 1], dtype=bool))
         assert_allclose(m, 0.6, rtol=0, atol=1e-10)
         assert_allclose(m2, 0.6, rtol=0, atol=1e-10)
 
     def test_pdist_jaccard_mtica2(self):
         m = jaccard(np.array([1, 0, 1]),
                     np.array([1, 1, 0]))
-        m2 = jaccard(np.array([1, 0, 1], dtype=np.bool),
-                     np.array([1, 1, 0], dtype=np.bool))
+        m2 = jaccard(np.array([1, 0, 1], dtype=bool),
+                     np.array([1, 1, 0], dtype=bool))
         assert_allclose(m, 2/3, rtol=0, atol=1e-10)
         assert_allclose(m2, 2/3, rtol=0, atol=1e-10)
 
@@ -884,8 +926,8 @@ class TestPdist(TestCase):
     def test_pdist_yule_mtica1(self):
         m = yule(np.array([1, 0, 1, 1, 0]),
                  np.array([1, 1, 0, 1, 1]))
-        m2 = yule(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                  np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = yule(np.array([1, 0, 1, 1, 0], dtype=bool),
+                  np.array([1, 1, 0, 1, 1], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 2, rtol=0, atol=1e-10)
@@ -894,8 +936,8 @@ class TestPdist(TestCase):
     def test_pdist_yule_mtica2(self):
         m = yule(np.array([1, 0, 1]),
                  np.array([1, 1, 0]))
-        m2 = yule(np.array([1, 0, 1], dtype=np.bool),
-                  np.array([1, 1, 0], dtype=np.bool))
+        m2 = yule(np.array([1, 0, 1], dtype=bool),
+                  np.array([1, 1, 0], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 2, rtol=0, atol=1e-10)
@@ -918,8 +960,8 @@ class TestPdist(TestCase):
     def test_pdist_dice_mtica1(self):
         m = dice(np.array([1, 0, 1, 1, 0]),
                  np.array([1, 1, 0, 1, 1]))
-        m2 = dice(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                  np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = dice(np.array([1, 0, 1, 1, 0], dtype=bool),
+                  np.array([1, 1, 0, 1, 1], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 3/7, rtol=0, atol=1e-10)
@@ -928,8 +970,8 @@ class TestPdist(TestCase):
     def test_pdist_dice_mtica2(self):
         m = dice(np.array([1, 0, 1]),
                  np.array([1, 1, 0]))
-        m2 = dice(np.array([1, 0, 1], dtype=np.bool),
-                  np.array([1, 1, 0], dtype=np.bool))
+        m2 = dice(np.array([1, 0, 1], dtype=bool),
+                  np.array([1, 1, 0], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 0.5, rtol=0, atol=1e-10)
@@ -952,8 +994,8 @@ class TestPdist(TestCase):
     def test_pdist_sokalsneath_mtica1(self):
         m = sokalsneath(np.array([1, 0, 1, 1, 0]),
                         np.array([1, 1, 0, 1, 1]))
-        m2 = sokalsneath(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                         np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = sokalsneath(np.array([1, 0, 1, 1, 0], dtype=bool),
+                         np.array([1, 1, 0, 1, 1], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 3/4, rtol=0, atol=1e-10)
@@ -962,8 +1004,8 @@ class TestPdist(TestCase):
     def test_pdist_sokalsneath_mtica2(self):
         m = sokalsneath(np.array([1, 0, 1]),
                         np.array([1, 1, 0]))
-        m2 = sokalsneath(np.array([1, 0, 1], dtype=np.bool),
-                         np.array([1, 1, 0], dtype=np.bool))
+        m2 = sokalsneath(np.array([1, 0, 1], dtype=bool),
+                         np.array([1, 1, 0], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 4/5, rtol=0, atol=1e-10)
@@ -986,8 +1028,8 @@ class TestPdist(TestCase):
     def test_pdist_rogerstanimoto_mtica1(self):
         m = rogerstanimoto(np.array([1, 0, 1, 1, 0]),
                            np.array([1, 1, 0, 1, 1]))
-        m2 = rogerstanimoto(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                            np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = rogerstanimoto(np.array([1, 0, 1, 1, 0], dtype=bool),
+                            np.array([1, 1, 0, 1, 1], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 3/4, rtol=0, atol=1e-10)
@@ -996,8 +1038,8 @@ class TestPdist(TestCase):
     def test_pdist_rogerstanimoto_mtica2(self):
         m = rogerstanimoto(np.array([1, 0, 1]),
                            np.array([1, 1, 0]))
-        m2 = rogerstanimoto(np.array([1, 0, 1], dtype=np.bool),
-                            np.array([1, 1, 0], dtype=np.bool))
+        m2 = rogerstanimoto(np.array([1, 0, 1], dtype=bool),
+                            np.array([1, 1, 0], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 4/5, rtol=0, atol=1e-10)
@@ -1020,8 +1062,8 @@ class TestPdist(TestCase):
     def test_pdist_russellrao_mtica1(self):
         m = russellrao(np.array([1, 0, 1, 1, 0]),
                        np.array([1, 1, 0, 1, 1]))
-        m2 = russellrao(np.array([1, 0, 1, 1, 0], dtype=np.bool),
-                        np.array([1, 1, 0, 1, 1], dtype=np.bool))
+        m2 = russellrao(np.array([1, 0, 1, 1, 0], dtype=bool),
+                        np.array([1, 1, 0, 1, 1], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 3/5, rtol=0, atol=1e-10)
@@ -1030,8 +1072,8 @@ class TestPdist(TestCase):
     def test_pdist_russellrao_mtica2(self):
         m = russellrao(np.array([1, 0, 1]),
                        np.array([1, 1, 0]))
-        m2 = russellrao(np.array([1, 0, 1], dtype=np.bool),
-                        np.array([1, 1, 0], dtype=np.bool))
+        m2 = russellrao(np.array([1, 0, 1], dtype=bool),
+                        np.array([1, 1, 0], dtype=bool))
         if verbose > 2:
             print(m)
         assert_allclose(m, 2/3, rtol=0, atol=1e-10)
@@ -1169,50 +1211,50 @@ class TestSomeDistanceFunctions(TestCase):
             assert_almost_equal(dist, np.sqrt(6.0))
 
 
-class TestSquareForm(TestCase):
+class TestSquareForm(object):
+    checked_dtypes = [np.float64, np.float32, np.int32, np.int8, bool]
 
-    def test_squareform_empty_matrix(self):
-        A = np.zeros((0,0))
-        rA = squareform(np.array(A, dtype='double'))
+    def test_squareform_matrix(self):
+        for dtype in self.checked_dtypes:
+            yield self.check_squareform_matrix, dtype
+
+    def test_squareform_vector(self):
+        for dtype in self.checked_dtypes:
+            yield self.check_squareform_vector, dtype
+
+    def check_squareform_matrix(self, dtype):
+        A = np.zeros((0,0), dtype=dtype)
+        rA = squareform(A)
         assert_equal(rA.shape, (0,))
+        assert_equal(rA.dtype, dtype)
 
-    def test_squareform_empty_vector(self):
-        v = np.zeros((0,))
-        rv = squareform(np.array(v, dtype='double'))
+        A = np.zeros((1,1), dtype=dtype)
+        rA = squareform(A)
+        assert_equal(rA.shape, (0,))
+        assert_equal(rA.dtype, dtype)
+
+        A = np.array([[0,4.2],[4.2,0]], dtype=dtype)
+        rA = squareform(A)
+        assert_equal(rA.shape, (1,))
+        assert_equal(rA.dtype, dtype)
+        assert_array_equal(rA, np.array([4.2], dtype=dtype))
+
+    def check_squareform_vector(self, dtype):
+        v = np.zeros((0,), dtype=dtype)
+        rv = squareform(v)
         assert_equal(rv.shape, (1,1))
-        assert_equal(rv[0, 0], 0)
+        assert_equal(rv.dtype, dtype)
+        assert_array_equal(rv, [[0]])
 
-    def test_squareform_1by1_matrix(self):
-        A = np.zeros((1,1))
-        rA = squareform(np.array(A, dtype='double'))
-        assert_equal(rA.shape, (0,))
-
-    def test_squareform_one_vector(self):
-        v = np.ones((1,)) * 8.3
-        rv = squareform(np.array(v, dtype='double'))
-        assert_equal(rv.shape, (2,2))
-        assert_equal(rv[0,1], 8.3)
-        assert_equal(rv[1,0], 8.3)
-
-    def test_squareform_one_binary_vector(self):
-        # Tests squareform on a 1x1 binary matrix; conversion to double was
-        # causing problems (see pull request 73).
-        v = np.ones((1,), dtype=np.bool)
+        v = np.array([8.3], dtype=dtype)
         rv = squareform(v)
         assert_equal(rv.shape, (2,2))
-        assert_(rv[0,1])
-
-    def test_squareform_2by2_matrix(self):
-        A = np.zeros((2,2))
-        A[0,1] = 0.8
-        A[1,0] = 0.8
-        rA = squareform(np.array(A, dtype='double'))
-        assert_equal(rA.shape, (1,))
-        assert_equal(rA[0], 0.8)
+        assert_equal(rv.dtype, dtype)
+        assert_array_equal(rv, np.array([[0,8.3],[8.3,0]], dtype=dtype))
 
     def test_squareform_multi_matrix(self):
         for n in xrange(2, 5):
-            yield self.check_squareform_multi_matrix(n)
+            yield self.check_squareform_multi_matrix, n
 
     def check_squareform_multi_matrix(self, n):
         X = np.random.rand(n, 4)
@@ -1329,15 +1371,6 @@ def is_valid_dm_throw(D):
 
 class TestIsValidDM(TestCase):
 
-    def test_is_valid_dm_int16_array_E(self):
-        # Tests is_valid_dm(*) on an int16 array. Exception expected.
-        D = np.zeros((5, 5), dtype='i')
-        assert_raises(TypeError, is_valid_dm_throw, (D))
-
-    def test_is_valid_dm_int16_array_F(self):
-        D = np.zeros((5, 5), dtype='i')
-        assert_equal(is_valid_dm(D), False)
-
     def test_is_valid_dm_improper_shape_1D_E(self):
         D = np.zeros((5,), dtype=np.double)
         assert_raises(ValueError, is_valid_dm_throw, (D))
@@ -1413,14 +1446,6 @@ class TestIsValidY(TestCase):
     # If test case name ends on "_E" then an exception is expected for the
     # given input, if it ends in "_F" then False is expected for the is_valid_y
     # check.  Otherwise the input is expected to be valid.
-
-    def test_is_valid_y_int16_array_E(self):
-        y = np.zeros((10,), dtype='i')
-        assert_raises(TypeError, is_valid_y_throw, (y))
-
-    def test_is_valid_y_int16_array_F(self):
-        y = np.zeros((10,), dtype='i')
-        assert_equal(is_valid_y(y), False)
 
     def test_is_valid_y_improper_shape_2D_E(self):
         y = np.zeros((3,3,), dtype=np.double)

@@ -10,9 +10,12 @@ __all__ = ['csr_matrix', 'isspmatrix_csr']
 import numpy as np
 from scipy._lib.six import xrange
 
+from .base import spmatrix
+
 from ._sparsetools import csr_tocsc, csr_tobsr, csr_count_blocks, \
         get_csr_submatrix, csr_sample_values
-from .sputils import upcast, isintlike, IndexMixin, issequence, get_index_dtype
+from .sputils import (upcast, isintlike, IndexMixin, issequence,
+                      get_index_dtype, ismatrix)
 
 from .compressed import _cs_matrix
 
@@ -123,18 +126,27 @@ class csr_matrix(_cs_matrix, IndexMixin):
            [0, 1, 1, 1]])
 
     """
+    format = 'csr'
 
-    def transpose(self, copy=False):
+    def transpose(self, axes=None, copy=False):
+        if axes is not None:
+            raise ValueError(("Sparse matrices do not support "
+                              "an 'axes' parameter because swapping "
+                              "dimensions is the only logical permutation."))
+
+        M, N = self.shape
+
         from .csc import csc_matrix
-        M,N = self.shape
-        return csc_matrix((self.data,self.indices,self.indptr), shape=(N,M), copy=copy)
+        return csc_matrix((self.data, self.indices,
+                           self.indptr), shape=(N, M), copy=copy)
 
-    def tolil(self):
+    transpose.__doc__ = spmatrix.transpose.__doc__
+
+    def tolil(self, copy=False):
         from .lil import lil_matrix
         lil = lil_matrix(self.shape,dtype=self.dtype)
 
-        self.sort_indices()  # lil_matrix needs sorted column indices
-
+        self.sum_duplicates()
         ptr,ind,dat = self.indptr,self.indices,self.data
         rows, data = lil.rows, lil.data
 
@@ -146,13 +158,17 @@ class csr_matrix(_cs_matrix, IndexMixin):
 
         return lil
 
+    tolil.__doc__ = spmatrix.tolil.__doc__
+
     def tocsr(self, copy=False):
         if copy:
             return self.copy()
         else:
             return self
 
-    def tocsc(self):
+    tocsr.__doc__ = spmatrix.tocsr.__doc__
+
+    def tocsc(self, copy=False):
         idx_dtype = get_index_dtype((self.indptr, self.indices),
                                     maxval=max(self.nnz, self.shape[0]))
         indptr = np.empty(self.shape[1] + 1, dtype=idx_dtype)
@@ -171,6 +187,8 @@ class csr_matrix(_cs_matrix, IndexMixin):
         A = csc_matrix((data, indices, indptr), shape=self.shape)
         A.has_sorted_indices = True
         return A
+
+    tocsr.__doc__ = spmatrix.tocsr.__doc__
 
     def tobsr(self, blocksize=None, copy=True):
         from .bsr import bsr_matrix
@@ -205,6 +223,8 @@ class csr_matrix(_cs_matrix, IndexMixin):
                       indptr, indices, data.ravel())
 
             return bsr_matrix((data,indices,indptr), shape=self.shape)
+
+    tobsr.__doc__ = spmatrix.tobsr.__doc__
 
     # these functions are used by the parent class (_cs_matrix)
     # to remove redudancy between csc_matrix and csr_matrix
@@ -283,14 +303,30 @@ class csr_matrix(_cs_matrix, IndexMixin):
                 # col is int or slice with step 1, row is slice with step 1.
                 return self._get_submatrix(row, col)
             elif issequence(col):
-                P = extractor(col,self.shape[1]).T        # [1:2,[1,2]]
                 # row is slice, col is sequence.
-                return self[row,:]*P
+                P = extractor(col,self.shape[1]).T        # [1:2,[1,2]]
+                sliced = self
+                if row != slice(None, None, None):
+                    sliced = sliced[row,:]
+                return sliced * P
+
         elif issequence(row):
             # [[1,2],??]
             if isintlike(col) or isinstance(col,slice):
                 P = extractor(row, self.shape[0])     # [[1,2],j] or [[1,2],1:2]
-                return (P*self)[:,col]
+                extracted = P * self
+                if col == slice(None, None, None):
+                    return extracted
+                else:
+                    return extracted[:,col]
+
+        elif ismatrix(row) and issequence(col):
+            if len(row[0]) == 1 and isintlike(row[0][0]):
+                # [[[1],[2]], [1,2]], outer indexing
+                row = asindices(row)
+                P_row = extractor(row[:,0], self.shape[0])
+                P_col = extractor(col, self.shape[1]).T
+                return P_row * self * P_col
 
         if not (issequence(col) and issequence(row)):
             # Sample elementwise
@@ -418,7 +454,6 @@ class csr_matrix(_cs_matrix, IndexMixin):
         shape = (i1 - i0, j1 - j0)
 
         return self.__class__((data,indices,indptr), shape=shape)
-
 
 def isspmatrix_csr(x):
     return isinstance(x, csr_matrix)

@@ -49,7 +49,8 @@ Assumes you have git and the binaries/tarballs in installers/::
     paver write_release_and_log
 
 This automatically put the checksum into NOTES.txt, and write the Changelog
-which can be uploaded to sourceforge.
+which can be uploaded to Github Releases (and maybe sourceforge for historical
+reasons, see gh-4939).
 
 
 TODO
@@ -90,19 +91,23 @@ try:
     # This is duplicated from setup.py
     if os.path.exists('.git'):
         GIT_REVISION = setup_py.git_version()
-    elif os.path.exists('scipy/version.py'):
-        # must be a source distribution, use existing version file
-        from numpy.version import git_revision as GIT_REVISION
     else:
         GIT_REVISION = "Unknown"
 
     if not setup_py.ISRELEASED:
         if GIT_REVISION == "Unknown":
-            FULLVERSION += '.dev'
+            FULLVERSION += '.dev0+Unknown'
         else:
-            FULLVERSION += '.dev-' + GIT_REVISION[:7]
+            FULLVERSION += '.dev0+' + GIT_REVISION[:7]
 finally:
     sys.path.pop(0)
+
+try:
+    # Ensure sensible file permissions
+    os.umask(0o022)
+except AttributeError:
+    # No umask on non-posix
+    pass
 
 
 #-----------------------------------
@@ -110,10 +115,10 @@ finally:
 #-----------------------------------
 
 # Source of the release notes
-RELEASE = 'doc/release/0.15.0-notes.rst'
+RELEASE = 'doc/release/0.19.0-notes.rst'
 
 # Start/end of the log (from git)
-LOG_START = 'v0.14.0'
+LOG_START = 'v0.18.0'
 LOG_END = 'master'
 
 
@@ -122,7 +127,7 @@ LOG_END = 'master'
 #-------------------------------------------------------
 
 # Default python version
-PYVER="2.6"
+PYVER="2.7"
 
 # Paver options object, holds all default dirs
 options(bootstrap=Bunch(bootstrap_dir="bootstrap"),
@@ -143,10 +148,12 @@ options(bootstrap=Bunch(bootstrap_dir="bootstrap"),
         bdist_wininst_simple=Bunch(python_version=PYVER),)
 
 # Where we can find BLAS/LAPACK/ATLAS on Windows/Wine
-SITECFG = {"sse3" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\vendor\binaries\sse3'},
-           "sse2" : {'BLAS': 'None', 'LAPACK': 'None', 'ATLAS': r'C:\local\vendor\binaries\sse2'},
-           "nosse" : {'ATLAS': 'None', 'BLAS': r'C:\local\vendor\binaries\nosse',
-                      'LAPACK': r'C:\local\vendor\binaries\nosse'}}
+SITECFG = {"sse3" : {'BLAS': 'None', 'LAPACK': 'None',
+                     'ATLAS': r'C:\local\lib\atlas\sse3'},
+           "sse2" : {'BLAS': 'None', 'LAPACK': 'None',
+                     'ATLAS': r'C:\local\lib\atlas\sse2'},
+           "nosse" : {'ATLAS': 'None', 'BLAS': r'C:\local\lib\atlas\nosse',
+                      'LAPACK': r'C:\local\lib\atlas\nosse'}}
 
 # Wine config for win32 builds
 if sys.platform == "win32":
@@ -169,9 +176,9 @@ elif sys.platform == "darwin":
 else:
     WINE_PY26 = [os.environ['HOME'] + "/.wine/drive_c/Python26/python.exe"]
     WINE_PY27 = [os.environ['HOME'] + "/.wine/drive_c/Python27/python.exe"]
-    WINE_PY32 = [os.environ['HOME'] + "/.wine/drive_c/Python32/python.exe"],
-    WINE_PY33 = [os.environ['HOME'] + "/.wine/drive_c/Python33/python.exe"],
-    WINE_PY34 = [os.environ['HOME'] + "/.wine/drive_c/Python34/python.exe"],
+    WINE_PY32 = [os.environ['HOME'] + "/.wine/drive_c/Python32/python.exe"]
+    WINE_PY33 = [os.environ['HOME'] + "/.wine/drive_c/Python33/python.exe"]
+    WINE_PY34 = [os.environ['HOME'] + "/.wine/drive_c/Python34/python.exe"]
     WINDOWS_ENV = os.environ
     MAKENSIS = ["wine", "makensis"]
 WINE_PYS = {'3.4':WINE_PY34, '3.3':WINE_PY33, '3.2':WINE_PY32,
@@ -279,8 +286,6 @@ def latex():
 @task
 @needs('latex')
 def pdf():
-    sdir = options.doc.sdir
-    bdir = options.doc.bdir
     bdir_latex = options.doc.bdir_latex
     destdir_pdf = options.doc.destdir_pdf
 
@@ -309,8 +314,19 @@ def tarball_name(type='gztar'):
 
 @task
 def sdist():
+    # First clean the repo and update submodules (for up-to-date doc html theme
+    # and Sphinx extensions)
+    sh('git clean -xdf')
+    sh('git submodule init')
+    sh('git submodule update')
+
+    # Fix file permissions
+    sh('chmod a+rX -R *')
+
     # To be sure to bypass paver when building sdist... paver + scipy.distutils
     # do not play well together.
+    # Cython is run over all Cython files in setup.py, so generated C files
+    # will be included.
     sh('python setup.py sdist --formats=gztar,zip')
     sh('python setup.py sdist --formats=tar')
     if os.path.exists(os.path.join('dist', tarball_name("xztar"))):
@@ -333,6 +349,21 @@ def sdist():
         source = os.path.join('dist', tarball_name(t))
         target = os.path.join(options.installers.installersdir, tarball_name(t))
         shutil.copy(source, target)
+
+@task
+def release(options):
+    """Automate everything to be done for a release with numpy-vendor"""
+    # Source tarballs
+    sdist()
+
+    # Windows .exe installers
+    options.python_version = '2.7'
+    bdist_superpack(options)
+    options.python_version = '3.4'
+    bdist_superpack(options)
+
+    # README (gpg signed) and Changelog
+    write_release_and_log()
 
 
 #---------------------------------------
@@ -410,7 +441,7 @@ def bdist_superpack(options):
         except OSError:
             # May be due to dev version having 'Unknown' in name, if git isn't
             # found.  This can be the case when compiling under Wine.
-            ix = source.find('.dev-') + 5
+            ix = source.find('.dev0+') + 6
             source = source[:ix] + 'Unknown' + source[ix+7:]
             os.rename(source, target)
 
@@ -429,8 +460,10 @@ def bdist_superpack(options):
     if not os.path.exists(options.installers.installersdir):
         os.makedirs(options.installers.installersdir)
 
-    source = os.path.join(options.superpack.builddir, superpack_name(pyver, FULLVERSION))
-    target = os.path.join(options.installers.installersdir, superpack_name(pyver, FULLVERSION))
+    source = os.path.join(options.superpack.builddir,
+                          superpack_name(pyver, FULLVERSION))
+    target = os.path.join(options.installers.installersdir,
+                          superpack_name(pyver, FULLVERSION))
     shutil.copy(source, target)
 
 @task
@@ -515,13 +548,9 @@ def _build_mpkg(pyver):
     numver = parse_numpy_version(MPKG_PYTHON[pyver])
     numverstr = ".".join(["%i" % i for i in numver])
     if pyver < "3.3":
-        # Numpy < 1.7 doesn't support Python 3.3
-        if not numver == (1, 5, 1):
-            raise ValueError("Scipy 0.14.x should be built against numpy "
-                             "1.5.1, (detected %s)" % numverstr)
-    else:
-        raise ValueError("Scipy 0.14.x should be built against numpy "
-                         "1.7.1, (detected %s) for Python >= 3.3" % numverstr)
+        if not numver == (1, 8, 2):
+            raise ValueError("Scipy 0.19.x should be built against numpy "
+                             "1.8.2, (detected %s) for Python >= 3.4" % numverstr)
 
     prepare_static_gfortran_runtime("build")
     # account for differences between Python 2.7.1 versions from python.org
@@ -531,7 +560,7 @@ def _build_mpkg(pyver):
         ldflags = "-undefined dynamic_lookup -bundle -arch i386 -arch ppc -Wl,-search_paths_first"
     ldflags += " -L%s" % os.path.join(os.path.dirname(__file__), "build")
 
-    sh("LDFLAGS='%s' %s setupegg.py bdist_mpkg" % (ldflags, MPKG_PYTHON[pyver]))
+    sh("LDFLAGS='%s' %s setup.py bdist_mpkg" % (ldflags, MPKG_PYTHON[pyver]))
 
 
 @task
@@ -657,9 +686,12 @@ def write_release_task(options, filename='NOTES.txt'):
     target = paver.path.path(filename)
     if target.exists():
         target.remove()
-    source.copy(target)
-    ftarget = open(str(target), 'a')
-    ftarget.writelines("""
+
+    tmp_target = paver.path.path(filename + '.tmp')
+    source.copy(tmp_target)
+
+    with open(str(tmp_target), 'a') as ftarget:
+        ftarget.writelines("""
 Checksums
 =========
 
@@ -667,13 +699,23 @@ MD5
 ~~~
 
 """)
-    ftarget.writelines(['%s\n' % c for c in compute_md5(idirs)])
-    ftarget.writelines("""
+        ftarget.writelines(['%s\n' % c for c in compute_md5(idirs)])
+        ftarget.writelines("""
 SHA256
 ~~~~~~
 
 """)
-    ftarget.writelines(['%s\n' % c for c in compute_sha256(idirs)])
+        ftarget.writelines(['%s\n' % c for c in compute_sha256(idirs)])
+
+    # Sign release
+    cmd = ['gpg', '--clearsign', '--armor']
+    if hasattr(options, 'gpg_key'):
+        cmd += ['--default-key', options.gpg_key]
+    cmd += ['--output', str(target), str(tmp_target)]
+    subprocess.check_call(cmd)
+    print("signed %s" % (target,))
+    tmp_target.remove()
+
 
 def write_log_task(filename='Changelog'):
     st = subprocess.Popen(
@@ -686,6 +728,7 @@ def write_log_task(filename='Changelog'):
     a.close()
 
 @task
+@cmdopts([('gpg_key=', 'g', 'GPG key to use for signing')])
 def write_release(options):
     write_release_task(options)
 
@@ -694,6 +737,7 @@ def write_log():
     write_log_task()
 
 @task
+@cmdopts([('gpg_key=', 'g', 'GPG key to use for signing')])
 def write_release_and_log(options):
     write_release_task(options, os.path.join(options.installers.releasedir, 'README'))
     write_log_task(os.path.join(options.installers.releasedir, 'Changelog'))

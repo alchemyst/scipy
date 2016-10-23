@@ -285,7 +285,7 @@ class MatFile5Reader(MatFileReader):
                 process = False
             else:
                 process = True
-            if variable_names and name not in variable_names:
+            if variable_names is not None and name not in variable_names:
                 self.mat_stream.seek(next_position)
                 continue
             try:
@@ -300,7 +300,7 @@ class MatFile5Reader(MatFileReader):
             mdict[name] = res
             if hdr.is_global:
                 mdict['__globals__'].append(name)
-            if variable_names:
+            if variable_names is not None:
                 variable_names.remove(name)
                 if len(variable_names) == 0:
                     break
@@ -445,7 +445,7 @@ def to_writeable(source):
             return EmptyStructMarker
     # Next try and convert to an array
     narr = np.asanyarray(source)
-    if narr.dtype.type in (np.object, np.object_) and \
+    if narr.dtype.type in (object, np.object_) and \
        narr.shape == () and narr == source:
         # No interesting conversion possible
         return None
@@ -571,7 +571,7 @@ class VarWriter5(object):
 
         Parameters
         ----------
-        arr : array-like
+        arr : array_like
             array-like object to create writer for
         name : str, optional
             name as it will appear in matlab workspace
@@ -591,7 +591,7 @@ class VarWriter5(object):
 
         Parameters
         ----------
-        arr : array-like
+        arr : array_like
             array-like object to create writer for
         '''
         # store position, so we can update the matrix tag
@@ -815,7 +815,7 @@ class MatFile5Writer(object):
            ``name`` which will appear in the matlab workspace in file load, and
            ``contents`` is something writeable to a matlab file, such as a numpy
            array.
-        write_header : {None, True, False}
+        write_header : {None, True, False}, optional
            If True, then write the matlab file header before writing the
            variables.  If None (the default) then write the file header
            if we are at position 0 in the stream.  By setting False

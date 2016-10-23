@@ -36,24 +36,21 @@ from .slsqp import _minimize_slsqp
 def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
              hessp=None, bounds=None, constraints=(), tol=None,
              callback=None, options=None):
-    """
-    Minimization of scalar function of one or more variables.
-     
-    In general, the optimization problems are of the form:
+    """Minimization of scalar function of one or more variables.
     
-    minimize f(x)
+    In general, the optimization problems are of the form::
     
-    subject to:
-    
-        ``g_i(x) >= 0``, i = 1,...,m
-        ``h_j(x)  = 0``, j = 1,...,p
-    
-    Where x is a vector of one or more variables.
+        minimize f(x) subject to
+
+        g_i(x) >= 0,  i = 1,...,m
+        h_j(x)  = 0,  j = 1,...,p
+
+    where x is a vector of one or more variables.
     ``g_i(x)`` are the inequality constraints.
     ``h_j(x)`` are the equality constrains.
-    
-    Optionally, the lower and upper bounds for each element in x can also be specified 
-    using the `bounds` argument.
+
+    Optionally, the lower and upper bounds for each element in x can also be
+    specified using the `bounds` argument.
 
     Parameters
     ----------
@@ -67,18 +64,19 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     method : str or callable, optional
         Type of solver.  Should be one of
 
-            - 'Nelder-Mead'
-            - 'Powell'
-            - 'CG'
-            - 'BFGS'
-            - 'Newton-CG'
-            - 'L-BFGS-B'
-            - 'TNC'
-            - 'COBYLA'
-            - 'SLSQP'
-            - 'dogleg'
-            - 'trust-ncg'
-            - custom - a callable object (added in version 0.14.0)
+            - 'Nelder-Mead' :ref:`(see here) <optimize.minimize-neldermead>`
+            - 'Powell'      :ref:`(see here) <optimize.minimize-powell>`
+            - 'CG'          :ref:`(see here) <optimize.minimize-cg>`
+            - 'BFGS'        :ref:`(see here) <optimize.minimize-bfgs>`
+            - 'Newton-CG'   :ref:`(see here) <optimize.minimize-newtoncg>`
+            - 'L-BFGS-B'    :ref:`(see here) <optimize.minimize-lbfgsb>`
+            - 'TNC'         :ref:`(see here) <optimize.minimize-tnc>`
+            - 'COBYLA'      :ref:`(see here) <optimize.minimize-cobyla>`
+            - 'SLSQP'       :ref:`(see here) <optimize.minimize-slsqp>`
+            - 'dogleg'      :ref:`(see here) <optimize.minimize-dogleg>`
+            - 'trust-ncg'   :ref:`(see here) <optimize.minimize-trustncg>`
+            - custom - a callable object (added in version 0.14.0),
+              see below for description.
 
         If not given, chosen to be one of ``BFGS``, ``L-BFGS-B``, ``SLSQP``,
         depending if the problem has constraints or bounds.
@@ -107,6 +105,7 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     constraints : dict or sequence of dict, optional
         Constraints definition (only for COBYLA and SLSQP).
         Each constraint is defined in a dictionary with fields:
+
             type : str
                 Constraint type: 'eq' for equality, 'ineq' for inequality.
             fun : callable
@@ -115,6 +114,7 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
                 The Jacobian of `fun` (only for SLSQP).
             args : sequence, optional
                 Extra arguments to be passed to the function and Jacobian.
+
         Equality constraint means that the constraint function result is to
         be zero whereas inequality means that it is to be non-negative.
         Note that COBYLA only supports inequality constraints.
@@ -124,10 +124,12 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     options : dict, optional
         A dictionary of solver options. All methods accept the following
         generic options:
+
             maxiter : int
                 Maximum number of iterations to perform.
             disp : bool
                 Set to True to print convergence messages.
+
         For method-specific options, see :func:`show_options()`.
     callback : callable, optional
         Called after each iteration, as ``callback(xk)``, where ``xk`` is the
@@ -156,65 +158,77 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
 
     **Unconstrained minimization**
 
-    Method *Nelder-Mead* uses the Simplex algorithm [1]_, [2]_. This
-    algorithm has been successful in many applications but other algorithms
-    using the first and/or second derivatives information might be preferred
-    for their better performances and robustness in general.
+    Method :ref:`Nelder-Mead <optimize.minimize-neldermead>` uses the
+    Simplex algorithm [1]_, [2]_. This algorithm is robust in many
+    applications. However, if numerical computation of derivative can be
+    trusted, other algorithms using the first and/or second derivatives
+    information might be preferred for their better performance in
+    general.
 
-    Method *Powell* is a modification of Powell's method [3]_, [4]_ which
-    is a conjugate direction method. It performs sequential one-dimensional
-    minimizations along each vector of the directions set (`direc` field in
-    `options` and `info`), which is updated at each iteration of the main
+    Method :ref:`Powell <optimize.minimize-powell>` is a modification
+    of Powell's method [3]_, [4]_ which is a conjugate direction
+    method. It performs sequential one-dimensional minimizations along
+    each vector of the directions set (`direc` field in `options` and
+    `info`), which is updated at each iteration of the main
     minimization loop. The function need not be differentiable, and no
     derivatives are taken.
 
-    Method *CG* uses a nonlinear conjugate gradient algorithm by Polak and
-    Ribiere, a variant of the Fletcher-Reeves method described in [5]_ pp.
-    120-122. Only the first derivatives are used.
+    Method :ref:`CG <optimize.minimize-cg>` uses a nonlinear conjugate
+    gradient algorithm by Polak and Ribiere, a variant of the
+    Fletcher-Reeves method described in [5]_ pp.  120-122. Only the
+    first derivatives are used.
 
-    Method *BFGS* uses the quasi-Newton method of Broyden, Fletcher,
-    Goldfarb, and Shanno (BFGS) [5]_ pp. 136. It uses the first derivatives
-    only. BFGS has proven good performance even for non-smooth
-    optimizations. This method also returns an approximation of the Hessian
-    inverse, stored as `hess_inv` in the OptimizeResult object.
+    Method :ref:`BFGS <optimize.minimize-bfgs>` uses the quasi-Newton
+    method of Broyden, Fletcher, Goldfarb, and Shanno (BFGS) [5]_
+    pp. 136. It uses the first derivatives only. BFGS has proven good
+    performance even for non-smooth optimizations. This method also
+    returns an approximation of the Hessian inverse, stored as
+    `hess_inv` in the OptimizeResult object.
 
-    Method *Newton-CG* uses a Newton-CG algorithm [5]_ pp. 168 (also known
-    as the truncated Newton method). It uses a CG method to the compute the
-    search direction. See also *TNC* method for a box-constrained
+    Method :ref:`Newton-CG <optimize.minimize-newtoncg>` uses a
+    Newton-CG algorithm [5]_ pp. 168 (also known as the truncated
+    Newton method). It uses a CG method to the compute the search
+    direction. See also *TNC* method for a box-constrained
     minimization with a similar algorithm.
 
-    Method *dogleg* uses the dog-leg trust-region algorithm [5]_
-    for unconstrained minimization. This algorithm requires the gradient
-    and Hessian; furthermore the Hessian is required to be positive definite.
+    Method :ref:`dogleg <optimize.minimize-dogleg>` uses the dog-leg
+    trust-region algorithm [5]_ for unconstrained minimization. This
+    algorithm requires the gradient and Hessian; furthermore the
+    Hessian is required to be positive definite.
 
-    Method *trust-ncg* uses the Newton conjugate gradient trust-region
-    algorithm [5]_ for unconstrained minimization. This algorithm requires
-    the gradient and either the Hessian or a function that computes the
-    product of the Hessian with a given vector.
+    Method :ref:`trust-ncg <optimize.minimize-trustncg>` uses the
+    Newton conjugate gradient trust-region algorithm [5]_ for
+    unconstrained minimization. This algorithm requires the gradient
+    and either the Hessian or a function that computes the product of
+    the Hessian with a given vector.
 
     **Constrained minimization**
 
-    Method *L-BFGS-B* uses the L-BFGS-B algorithm [6]_, [7]_ for bound
-    constrained minimization.
+    Method :ref:`L-BFGS-B <optimize.minimize-lbfgsb>` uses the L-BFGS-B
+    algorithm [6]_, [7]_ for bound constrained minimization.
 
-    Method *TNC* uses a truncated Newton algorithm [5]_, [8]_ to minimize a
-    function with variables subject to bounds. This algorithm uses
-    gradient information; it is also called Newton Conjugate-Gradient. It
-    differs from the *Newton-CG* method described above as it wraps a C
-    implementation and allows each variable to be given upper and lower
-    bounds.
+    Method :ref:`TNC <optimize.minimize-tnc>` uses a truncated Newton
+    algorithm [5]_, [8]_ to minimize a function with variables subject
+    to bounds. This algorithm uses gradient information; it is also
+    called Newton Conjugate-Gradient. It differs from the *Newton-CG*
+    method described above as it wraps a C implementation and allows
+    each variable to be given upper and lower bounds.
 
-    Method *COBYLA* uses the Constrained Optimization BY Linear
-    Approximation (COBYLA) method [9]_, [10]_, [11]_. The algorithm is
-    based on linear approximations to the objective function and each
-    constraint. The method wraps a FORTRAN implementation of the algorithm.
+    Method :ref:`COBYLA <optimize.minimize-cobyla>` uses the
+    Constrained Optimization BY Linear Approximation (COBYLA) method
+    [9]_, [10]_, [11]_. The algorithm is based on linear
+    approximations to the objective function and each constraint. The
+    method wraps a FORTRAN implementation of the algorithm. The
+    constraints functions 'fun' may return either a single number
+    or an array or list of numbers.
 
-    Method *SLSQP* uses Sequential Least SQuares Programming to minimize a
-    function of several variables with any combination of bounds, equality
-    and inequality constraints. The method wraps the SLSQP Optimization
-    subroutine originally implemented by Dieter Kraft [12]_. Note that the
-    wrapper handles infinite values in bounds by converting them into large
-    floating values.
+    Method :ref:`SLSQP <optimize.minimize-slsqp>` uses Sequential
+    Least SQuares Programming to minimize a function of several
+    variables with any combination of bounds, equality and inequality
+    constraints. The method wraps the SLSQP Optimization subroutine
+    originally implemented by Dieter Kraft [12]_. Note that the
+    wrapper handles infinite values in bounds by converting them into
+    large floating values.
 
     **Custom minimizers**
 
@@ -288,9 +302,9 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     A simple application of the *Nelder-Mead* method is:
 
     >>> x0 = [1.3, 0.7, 0.8, 1.9, 1.2]
-    >>> res = minimize(rosen, x0, method='Nelder-Mead')
+    >>> res = minimize(rosen, x0, method='Nelder-Mead', tol=1e-6)
     >>> res.x
-    [ 1.  1.  1.  1.  1.]
+    array([ 1.,  1.,  1.,  1.,  1.])
 
     Now using the *BFGS* algorithm, using the first derivative and a few
     options:
@@ -299,19 +313,19 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     ...                options={'gtol': 1e-6, 'disp': True})
     Optimization terminated successfully.
              Current function value: 0.000000
-             Iterations: 52
-             Function evaluations: 64
-             Gradient evaluations: 64
+             Iterations: 26
+             Function evaluations: 31
+             Gradient evaluations: 31
     >>> res.x
-    [ 1.  1.  1.  1.  1.]
-    >>> print res.message
+    array([ 1.,  1.,  1.,  1.,  1.])
+    >>> print(res.message)
     Optimization terminated successfully.
-    >>> res.hess
-    [[ 0.00749589  0.01255155  0.02396251  0.04750988  0.09495377]
-     [ 0.01255155  0.02510441  0.04794055  0.09502834  0.18996269]
-     [ 0.02396251  0.04794055  0.09631614  0.19092151  0.38165151]
-     [ 0.04750988  0.09502834  0.19092151  0.38341252  0.7664427 ]
-     [ 0.09495377  0.18996269  0.38165151  0.7664427   1.53713523]]
+    >>> res.hess_inv
+    array([[ 0.00749589,  0.01255155,  0.02396251,  0.04750988,  0.09495377],  # may vary
+           [ 0.01255155,  0.02510441,  0.04794055,  0.09502834,  0.18996269],
+           [ 0.02396251,  0.04794055,  0.09631614,  0.19092151,  0.38165151],
+           [ 0.04750988,  0.09502834,  0.19092151,  0.38341252,  0.7664427 ],
+           [ 0.09495377,  0.18996269,  0.38165151,  0.7664427,   1.53713523]])
 
 
     Next, consider a minimization problem with several constraints (namely
@@ -404,9 +418,12 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
     # set default tolerances
     if tol is not None:
         options = dict(options)
-        if meth in ['nelder-mead', 'newton-cg', 'powell', 'tnc']:
+        if meth == 'nelder-mead':
+            options.setdefault('xatol', tol)
+            options.setdefault('fatol', tol)
+        if meth in ['newton-cg', 'powell', 'tnc']:
             options.setdefault('xtol', tol)
-        if meth in ['nelder-mead', 'powell', 'l-bfgs-b', 'tnc', 'slsqp']:
+        if meth in ['powell', 'l-bfgs-b', 'tnc', 'slsqp']:
             options.setdefault('ftol', tol)
         if meth in ['bfgs', 'cg', 'l-bfgs-b', 'tnc', 'dogleg', 'trust-ncg']:
             options.setdefault('gtol', tol)
@@ -451,8 +468,7 @@ def minimize(fun, x0, args=(), method=None, jac=None, hess=None,
 
 def minimize_scalar(fun, bracket=None, bounds=None, args=(),
                     method='brent', tol=None, options=None):
-    """
-    Minimization of scalar function of one variable.
+    """Minimization of scalar function of one variable.
 
     Parameters
     ----------
@@ -474,10 +490,11 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
     method : str or callable, optional
         Type of solver.  Should be one of
 
-            - 'Brent'
-            - 'Bounded'
-            - 'Golden'
-            - custom - a callable object (added in version 0.14.0)
+            - 'Brent'     :ref:`(see here) <optimize.minimize_scalar-brent>`
+            - 'Bounded'   :ref:`(see here) <optimize.minimize_scalar-bounded>`
+            - 'Golden'    :ref:`(see here) <optimize.minimize_scalar-golden>`
+            - custom - a callable object (added in version 0.14.0),
+              see below
     tol : float, optional
         Tolerance for termination. For detailed control, use solver-specific
         options.
@@ -510,16 +527,19 @@ def minimize_scalar(fun, bracket=None, bounds=None, args=(),
     This section describes the available solvers that can be selected by the
     'method' parameter. The default method is *Brent*.
 
-    Method *Brent* uses Brent's algorithm to find a local minimum.
-    The algorithm uses inverse parabolic interpolation when possible to
-    speed up convergence of the golden section method.
+    Method :ref:`Brent <optimize.minimize_scalar-brent>` uses Brent's
+    algorithm to find a local minimum.  The algorithm uses inverse
+    parabolic interpolation when possible to speed up convergence of
+    the golden section method.
 
-    Method *Golden* uses the golden section search technique. It uses
-    analog of the bisection method to decrease the bracketed interval. It
-    is usually preferable to use the *Brent* method.
+    Method :ref:`Golden <optimize.minimize_scalar-golden>` uses the
+    golden section search technique. It uses analog of the bisection
+    method to decrease the bracketed interval. It is usually
+    preferable to use the *Brent* method.
 
-    Method *Bounded* can perform bounded minimization. It uses the Brent
-    method to find a local minimum in the interval x1 < xopt < x2.
+    Method :ref:`Bounded <optimize.minimize_scalar-bounded>` can
+    perform bounded minimization. It uses the Brent method to find a
+    local minimum in the interval x1 < xopt < x2.
 
     **Custom minimizers**
 
